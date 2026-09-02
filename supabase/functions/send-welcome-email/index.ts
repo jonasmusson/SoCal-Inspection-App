@@ -17,6 +17,7 @@ Deno.serve(async (req: Request) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const resendKey = Deno.env.get("RESEND_API_KEY");
     const appUrl = Deno.env.get("APP_URL") || "https://socalautoworks.com";
+    const fromEmail = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
 
     if (!supabaseUrl || !serviceKey) return new Response(JSON.stringify({ error: "Config error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
@@ -53,7 +54,7 @@ Deno.serve(async (req: Request) => {
     const emailRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: "SoCal Autoworks <onboarding@resend.dev>", to: profile.email, subject, html }),
+      body: JSON.stringify({ from: `SoCal Autoworks <${fromEmail}>`, to: profile.email, subject, html }),
     });
 
     if (!emailRes.ok) {
