@@ -14,7 +14,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { TemplateEditorPage } from './pages/TemplateEditorPage';
 import { CheckInPage } from './pages/CheckInPage';
-import { supabase } from './lib/supabase';
+import { supabase, supabaseConfigured } from './lib/supabase';
 import { Clock, LogOut } from 'lucide-react';
 
 // Navigates to the first incomplete section, falling back to section 1
@@ -129,6 +129,20 @@ function AppRoutes() {
 }
 
 function App() {
+  if (!supabaseConfigured) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center px-6">
+        <div className="max-w-md rounded-2xl border border-amber-500/30 bg-gray-900 p-8 text-center shadow-2xl">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-400">SoCal Autoworks</p>
+          <h1 className="mt-3 text-2xl font-bold text-white">Database connection required</h1>
+          <p className="mt-3 text-sm leading-6 text-gray-300">
+            This deployment is ready, but it has not been connected to the existing Supabase project.
+            Add the Supabase URL and anonymous key in the Bolt project settings, then publish again.
+          </p>
+        </div>
+      </div>
+    );
+  }
   return (
     <BrowserRouter>
       <AuthProvider><AppRoutes /></AuthProvider>
