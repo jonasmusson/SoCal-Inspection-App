@@ -10,13 +10,6 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: corsHeaders });
 
   try {
-    const { inspectionId, techId } = await req.json();
-    if (!inspectionId || !techId) {
-      return new Response(JSON.stringify({ error: "inspectionId and techId required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const resendKey = Deno.env.get("RESEND_API_KEY");
@@ -36,6 +29,24 @@ Deno.serve(async (req: Request) => {
       apikey: serviceKey,
       "Content-Type": "application/json",
     };
+
+    const callerAuthorization = req.headers.get("Authorization");
+    if (!callerAuthorization) return new Response(JSON.stringify({ error: "Authentication required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const callerRes = await fetch(`${supabaseUrl}/auth/v1/user`, { headers: { Authorization: callerAuthorization, apikey: serviceKey } });
+    if (!callerRes.ok) return new Response(JSON.stringify({ error: "Invalid session" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const caller = await callerRes.json();
+    const callerProfileRes = await fetch(`${supabaseUrl}/rest/v1/user_profiles?id=eq.${encodeURIComponent(caller.id)}&select=role,status`, { headers: dbHeaders });
+    const [callerProfile] = await callerProfileRes.json();
+    if (!callerProfile || callerProfile.status !== "active" || !["owner", "manager"].includes(callerProfile.role)) {
+      return new Response(JSON.stringify({ error: "Manager or owner access required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { inspectionId, techId } = await req.json();
+    if (!inspectionId || !techId) {
+      return new Response(JSON.stringify({ error: "inspectionId and techId required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const [inspRes, techRes, settingsRes] = await Promise.all([
       fetch(`${supabaseUrl}/rest/v1/inspections?id=eq.${inspectionId}&select=*`, { headers: dbHeaders }),
