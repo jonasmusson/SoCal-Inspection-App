@@ -1,0 +1,14 @@
+[functions.notify-tech-assignment]
+verify_jwt = true
+
+[functions.send-inspection-report]
+verify_jwt = true
+
+[functions.send-signup-confirmation]
+verify_jwt = true
+
+[functions.send-welcome-email]
+verify_jwt = true
+
+[functions.upload-brand-logo]
+verify_jwt = true

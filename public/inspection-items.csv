@@ -1,0 +1,145 @@
+Template,Section #,Section Name,Item #,Item Name,Item Key,Photo Required,Notes Required
+Air-Cooled Porsche,1,Exterior & Body,1,Paint Condition,paint_condition,TRUE,FALSE
+Air-Cooled Porsche,1,Exterior & Body,2,Rust,rust,TRUE,FALSE
+Air-Cooled Porsche,1,Exterior & Body,3,Panel Fit & Alignment,panel_fit,TRUE,FALSE
+Air-Cooled Porsche,1,Exterior & Body,4,Glass,glass,FALSE,FALSE
+Air-Cooled Porsche,1,Exterior & Body,5,Trim & Brightwork,trim,FALSE,FALSE
+Air-Cooled Porsche,1,Exterior & Body,6,Door Fit,door_fit,FALSE,FALSE
+Air-Cooled Porsche,2,Undercarriage & Chassis,1,Floor Pans,floor_pans,TRUE,TRUE
+Air-Cooled Porsche,2,Undercarriage & Chassis,2,Chassis Rails,chassis_rails,TRUE,FALSE
+Air-Cooled Porsche,2,Undercarriage & Chassis,3,Torsion Bar Tubes,torsion_bar_tubes,TRUE,FALSE
+Air-Cooled Porsche,2,Undercarriage & Chassis,4,Heat Exchanger Condition,heat_exchangers,TRUE,TRUE
+Air-Cooled Porsche,2,Undercarriage & Chassis,5,Undercarriage Leaks,undercarriage_leaks,FALSE,FALSE
+Air-Cooled Porsche,2,Undercarriage & Chassis,6,Jack Points,jack_points,FALSE,FALSE
+Air-Cooled Porsche,3,Engine Bay,1,Tin Ware Completeness,tin_ware,TRUE,FALSE
+Air-Cooled Porsche,3,Engine Bay,2,Fan Shroud,fan_shroud,TRUE,FALSE
+Air-Cooled Porsche,3,Engine Bay,3,Oil Leaks,oil_leaks,TRUE,FALSE
+Air-Cooled Porsche,3,Engine Bay,4,Wiring Condition,bay_wiring,FALSE,FALSE
+Air-Cooled Porsche,3,Engine Bay,5,Hoses & Clamps,bay_hoses,FALSE,FALSE
+Air-Cooled Porsche,4,Air-Cooled Engine,1,Fan Belt,fan_belt,FALSE,FALSE
+Air-Cooled Porsche,4,Air-Cooled Engine,2,Oil Cooler,oil_cooler,FALSE,FALSE
+Air-Cooled Porsche,4,Air-Cooled Engine,3,Compression,compression,FALSE,TRUE
+Air-Cooled Porsche,4,Air-Cooled Engine,4,Engine Noise,engine_noise,FALSE,TRUE
+Air-Cooled Porsche,4,Air-Cooled Engine,5,Cold Start Behavior,cold_start,FALSE,TRUE
+Air-Cooled Porsche,4,Air-Cooled Engine,6,Oil Consumption,oil_consumption,FALSE,TRUE
+Air-Cooled Porsche,4,Air-Cooled Engine,7,Cooling Effectiveness,cooling,FALSE,FALSE
+Air-Cooled Porsche,5,Fuel System,1,Carbs / Fuel Injection,carbs_injection,FALSE,FALSE
+Air-Cooled Porsche,5,Fuel System,2,Fuel Delivery,fuel_delivery,FALSE,FALSE
+Air-Cooled Porsche,5,Fuel System,3,Fuel Lines,fuel_lines,FALSE,FALSE
+Air-Cooled Porsche,5,Fuel System,4,Filter,fuel_filter,FALSE,FALSE
+Air-Cooled Porsche,6,Transmission,1,Shift Quality,shift_quality,FALSE,FALSE
+Air-Cooled Porsche,6,Transmission,2,Synchros,synchros,FALSE,TRUE
+Air-Cooled Porsche,6,Transmission,3,Engagement,engagement,FALSE,FALSE
+Air-Cooled Porsche,6,Transmission,4,Fluid,trans_fluid,FALSE,FALSE
+Air-Cooled Porsche,6,Transmission,5,Leaks,trans_leaks,FALSE,FALSE
+Air-Cooled Porsche,7,Suspension,1,Torsion Bars,torsion_bars,FALSE,FALSE
+Air-Cooled Porsche,7,Suspension,2,Front Suspension,front_susp,FALSE,FALSE
+Air-Cooled Porsche,7,Suspension,3,Ball Joints,ball_joints,FALSE,FALSE
+Air-Cooled Porsche,7,Suspension,4,Wheel Bearings,wheel_bearings,FALSE,FALSE
+Air-Cooled Porsche,7,Suspension,5,Ride Height,ride_height,FALSE,FALSE
+Air-Cooled Porsche,7,Suspension,6,Alignment,alignment,FALSE,FALSE
+Air-Cooled Porsche,8,Brakes,1,Pads,pads,FALSE,FALSE
+Air-Cooled Porsche,8,Brakes,2,Rotors,rotors,FALSE,FALSE
+Air-Cooled Porsche,8,Brakes,3,Calipers,calipers,FALSE,FALSE
+Air-Cooled Porsche,8,Brakes,4,Lines,brake_lines,FALSE,FALSE
+Air-Cooled Porsche,8,Brakes,5,Master Cylinder,master_cylinder,FALSE,FALSE
+Air-Cooled Porsche,8,Brakes,6,Emergency Brake,emergency_brake,FALSE,FALSE
+Air-Cooled Porsche,9,Electrical,1,Battery,battery,FALSE,FALSE
+Air-Cooled Porsche,9,Electrical,2,Charging System,charging,FALSE,FALSE
+Air-Cooled Porsche,9,Electrical,3,Gauges & Instruments,gauges,FALSE,FALSE
+Air-Cooled Porsche,9,Electrical,4,Interior Electronics,interior_electrics,FALSE,FALSE
+Air-Cooled Porsche,9,Electrical,5,Lights,lights,FALSE,FALSE
+Air-Cooled Porsche,9,Electrical,6,Wiring Condition,wiring,FALSE,FALSE
+Air-Cooled Porsche,10,Test Drive,1,Cold Idle,cold_idle,FALSE,TRUE
+Air-Cooled Porsche,10,Test Drive,2,Warm Idle,warm_idle,FALSE,FALSE
+Air-Cooled Porsche,10,Test Drive,3,Acceleration,acceleration,FALSE,FALSE
+Air-Cooled Porsche,10,Test Drive,4,Shifting,shifting,FALSE,FALSE
+Air-Cooled Porsche,10,Test Drive,5,Braking,braking,FALSE,FALSE
+Air-Cooled Porsche,10,Test Drive,6,Handling,handling,FALSE,FALSE
+Air-Cooled Porsche,10,Test Drive,7,Oil Temperature,oil_temp,FALSE,TRUE
+Air-Cooled Porsche,10,Test Drive,8,Unusual Noises,unusual_noises,FALSE,TRUE
+Quick Inspection,1,Exterior & Glass,1,Paint Condition,paint_condition,TRUE,FALSE
+Quick Inspection,1,Exterior & Glass,2,Rust,rust,TRUE,FALSE
+Quick Inspection,1,Exterior & Glass,3,Glass,glass,FALSE,FALSE
+Quick Inspection,1,Exterior & Glass,4,Trim,trim,FALSE,FALSE
+Quick Inspection,2,Under Hood,1,Oil Condition,oil_condition,FALSE,FALSE
+Quick Inspection,2,Under Hood,2,Oil Leaks,oil_leaks,FALSE,FALSE
+Quick Inspection,2,Under Hood,3,Belts,belts,FALSE,FALSE
+Quick Inspection,2,Under Hood,4,Coolant,coolant,FALSE,FALSE
+Quick Inspection,2,Under Hood,5,Hoses,hoses,FALSE,FALSE
+Quick Inspection,3,Undercarriage,1,Frame,frame,TRUE,FALSE
+Quick Inspection,3,Undercarriage,2,Floor Pans,floor_pans,TRUE,FALSE
+Quick Inspection,3,Undercarriage,3,Leaks,leaks,FALSE,FALSE
+Quick Inspection,3,Undercarriage,4,Exhaust,exhaust,FALSE,FALSE
+Quick Inspection,4,Brakes & Wheels,1,Pads,pads,FALSE,FALSE
+Quick Inspection,4,Brakes & Wheels,2,Rotors,rotors,FALSE,FALSE
+Quick Inspection,4,Brakes & Wheels,3,Tire Condition,tire_condition,FALSE,FALSE
+Quick Inspection,4,Brakes & Wheels,4,Tread,tread,FALSE,FALSE
+Quick Inspection,5,Test Drive,1,Acceleration,acceleration,FALSE,FALSE
+Quick Inspection,5,Test Drive,2,Braking,braking,FALSE,FALSE
+Quick Inspection,5,Test Drive,3,Steering,steering,FALSE,FALSE
+Quick Inspection,5,Test Drive,4,Vibration,vibration,FALSE,FALSE
+Standard Inspection,1,Test Drive,1,Acceleration,acceleration,FALSE,FALSE
+Standard Inspection,1,Test Drive,2,Shifting,shifting,FALSE,FALSE
+Standard Inspection,1,Test Drive,3,Braking,braking,FALSE,FALSE
+Standard Inspection,1,Test Drive,4,Steering,test_steering,FALSE,FALSE
+Standard Inspection,1,Test Drive,5,Vibration,vibration,FALSE,FALSE
+Standard Inspection,1,Test Drive,6,Temperature,temperature,FALSE,FALSE
+Standard Inspection,2,Body & Paint,1,Paint Condition,paint_condition,FALSE,FALSE
+Standard Inspection,2,Body & Paint,2,Rust,rust,FALSE,FALSE
+Standard Inspection,2,Body & Paint,3,Panel Fit,panel_fit,FALSE,FALSE
+Standard Inspection,2,Body & Paint,4,Glass,glass,FALSE,FALSE
+Standard Inspection,2,Body & Paint,5,Trim,trim,FALSE,FALSE
+Standard Inspection,3,Undercarriage,1,Frame,frame,FALSE,FALSE
+Standard Inspection,3,Undercarriage,2,Floor Pans,floor_pans,FALSE,FALSE
+Standard Inspection,3,Undercarriage,3,Leaks,leaks,FALSE,FALSE
+Standard Inspection,3,Undercarriage,4,Exhaust,exhaust,FALSE,FALSE
+Standard Inspection,3,Undercarriage,5,Rust Severity,rust_severity,FALSE,FALSE
+Standard Inspection,4,Suspension & Steering,1,Ball Joints,ball_joints,FALSE,FALSE
+Standard Inspection,4,Suspension & Steering,2,Bushings,bushings,FALSE,FALSE
+Standard Inspection,4,Suspension & Steering,3,Shocks,shocks,FALSE,FALSE
+Standard Inspection,4,Suspension & Steering,4,Steering,steering,FALSE,FALSE
+Standard Inspection,4,Suspension & Steering,5,Ride Height,ride_height,FALSE,FALSE
+Standard Inspection,4,Suspension & Steering,6,Clearance,clearance,FALSE,FALSE
+Standard Inspection,5,Engine,1,Cold Start,cold_start,FALSE,FALSE
+Standard Inspection,5,Engine,2,Oil Condition,oil_condition,FALSE,FALSE
+Standard Inspection,5,Engine,3,Oil Leaks,oil_leaks,FALSE,FALSE
+Standard Inspection,5,Engine,4,Noise,noise,FALSE,FALSE
+Standard Inspection,5,Engine,5,Throttle,throttle,FALSE,FALSE
+Standard Inspection,5,Engine,6,Belts,belts,FALSE,FALSE
+Standard Inspection,5,Engine,7,Compression,compression,FALSE,FALSE
+Standard Inspection,6,Cooling,1,Radiator,radiator,FALSE,FALSE
+Standard Inspection,6,Cooling,2,Hoses,hoses,FALSE,FALSE
+Standard Inspection,6,Cooling,3,Coolant,coolant,FALSE,FALSE
+Standard Inspection,6,Cooling,4,Water Pump,water_pump,FALSE,FALSE
+Standard Inspection,6,Cooling,5,Fan,fan,FALSE,FALSE
+Standard Inspection,7,Brakes,1,Pads,pads,FALSE,FALSE
+Standard Inspection,7,Brakes,2,Rotors,rotors,FALSE,FALSE
+Standard Inspection,7,Brakes,3,Lines,lines,FALSE,FALSE
+Standard Inspection,7,Brakes,4,Master Cylinder,master_cylinder,FALSE,FALSE
+Standard Inspection,7,Brakes,5,Pedal,pedal,FALSE,FALSE
+Standard Inspection,7,Brakes,6,Emergency Brake,emergency_brake,FALSE,FALSE
+Standard Inspection,8,Wheels & Tires,1,Tire Condition,tire_condition,FALSE,FALSE
+Standard Inspection,8,Wheels & Tires,2,Tread,tread,FALSE,FALSE
+Standard Inspection,8,Wheels & Tires,3,Wear,wear,FALSE,FALSE
+Standard Inspection,8,Wheels & Tires,4,Wheels,wheels,FALSE,FALSE
+Standard Inspection,9,Fuel System,1,Tank,tank,FALSE,FALSE
+Standard Inspection,9,Fuel System,2,Lines,fuel_lines,FALSE,FALSE
+Standard Inspection,9,Fuel System,3,Pump,pump,FALSE,FALSE
+Standard Inspection,9,Fuel System,4,Filter,filter,FALSE,FALSE
+Standard Inspection,10,Exhaust,1,Leaks,exhaust_leaks,FALSE,FALSE
+Standard Inspection,10,Exhaust,2,Fitment,fitment,FALSE,FALSE
+Standard Inspection,10,Exhaust,3,Rust,exhaust_rust,FALSE,FALSE
+Standard Inspection,10,Exhaust,4,Mounting,mounting,FALSE,FALSE
+Standard Inspection,11,Transmission,1,Shift Quality,shift_quality,FALSE,FALSE
+Standard Inspection,11,Transmission,2,Engagement,engagement,FALSE,FALSE
+Standard Inspection,11,Transmission,3,Fluid,fluid,FALSE,FALSE
+Standard Inspection,11,Transmission,4,Leaks,trans_leaks,FALSE,FALSE
+Standard Inspection,12,Driveline,1,Differential,differential,FALSE,FALSE
+Standard Inspection,12,Driveline,2,Driveshaft,driveshaft,FALSE,FALSE
+Standard Inspection,12,Driveline,3,U-Joints,u_joints,FALSE,FALSE
+Standard Inspection,13,Electrical,1,Battery,battery,FALSE,FALSE
+Standard Inspection,13,Electrical,2,Charging,charging,FALSE,FALSE
+Standard Inspection,13,Electrical,3,Wiring,wiring,FALSE,FALSE
+Standard Inspection,13,Electrical,4,Lights,lights,FALSE,FALSE
+Standard Inspection,13,Electrical,5,Gauges,gauges,FALSE,FALSE

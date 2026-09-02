@@ -1,0 +1,13 @@
+{
+  "name": "SoCal Autoworks Inspection",
+  "short_name": "Inspection",
+  "description": "Progressive web app for auto shop inspections",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
