@@ -175,7 +175,7 @@ Deno.serve(async (req: Request) => {
 
     <!-- Header -->
     <div style="background:#fff;border-radius:16px 16px 0 0;padding:28px 32px 0;text-align:center;border-bottom:none">
-      <img src="https://phefpvsqgjkeivzrrlmz.supabase.co/storage/v1/object/public/brand/logo.png" alt="SoCal Autoworks" style="height:56px;object-fit:contain;margin:0 auto 20px;display:block" />
+      <img src="https://osvzenblbfkxrjnexhaz.supabase.co/storage/v1/object/public/brand/logo.png" alt="SoCal Autoworks" style="height:56px;object-fit:contain;margin:0 auto 20px;display:block" />
       <div style="background:linear-gradient(135deg,#20251f,#3d463a);border-radius:12px;padding:28px 32px;text-align:center;margin-bottom:0"><p style="margin:0 0 4px;color:#d3b56d;font-size:11px;letter-spacing:.16em;text-transform:uppercase">SoCal Autoworks · Comprehensive Inspection</p>
         <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700">${insp.vehicle_year} ${insp.vehicle_make} ${insp.vehicle_model}</h1>
         ${vehicleSubtitle ? `<p style="margin:8px 0 0;color:rgba(255,255,255,.7);font-size:14px">${vehicleSubtitle}</p>` : ""}
