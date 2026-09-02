@@ -20,6 +20,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const resendKey = Deno.env.get("RESEND_API_KEY");
+    const fromEmail = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
     const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const twilioToken = Deno.env.get("TWILIO_AUTH_TOKEN");
     const twilioFrom = Deno.env.get("TWILIO_FROM_NUMBER");
@@ -81,7 +82,7 @@ Deno.serve(async (req: Request) => {
       const emailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: `${shopName} <onboarding@resend.dev>`, to: tech.email, subject, html }),
+        body: JSON.stringify({ from: `${shopName} <${fromEmail}>`, to: tech.email, subject, html }),
       });
       results.emailSent = emailRes.ok;
       if (!emailRes.ok) results.emailError = await emailRes.json().catch(() => ({}));
