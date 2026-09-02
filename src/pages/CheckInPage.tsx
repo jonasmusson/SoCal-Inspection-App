@@ -99,6 +99,14 @@ export function CheckInPage() {
     setShowCamera(false);
   }
 
+  function handlePhotoUpload(files: FileList | null) {
+    if (!files) return;
+    const additions = Array.from(files)
+      .filter(file => file.type.startsWith('image/'))
+      .map(file => ({ file, preview: URL.createObjectURL(file) }));
+    setLocalPhotos(prev => [...prev, ...additions]);
+  }
+
   function removePhoto(idx: number) {
     setLocalPhotos(prev => { URL.revokeObjectURL(prev[idx].preview); return prev.filter((_, i) => i !== idx); });
   }
@@ -108,13 +116,12 @@ export function CheckInPage() {
     setShowVideoRecorder(false);
   }
 
+  function handleVideoUpload(file: File | undefined) {
+    if (file?.type.startsWith('video/')) setLocalVideo(file);
+  }
+
   const photosRef = useRef<HTMLElement | null>(null);
   const videoSectionRef = useRef<HTMLElement | null>(null);
-
-  function handleDisabledSubmit() {
-    if (!photosOk) { photosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
-    if (!videoOk) { videoSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-  }
 
   async function handleSubmit() {
     if (!form.template_id || !profile) return;
@@ -551,21 +558,23 @@ export function CheckInPage() {
                 </div>
               )}
 
-              <button
-                onClick={() => setShowCamera(true)}
-                className={`flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl border w-full justify-center mt-3 transition-colors ${
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCamera(true)}
+                  className="flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 justify-center hover:bg-gray-50">
+                  <Camera className="w-4 h-4" /> Use Camera
+                </button>
+                <label className={`flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border justify-center cursor-pointer transition-colors ${
                   photosRequired && localPhotos.length < requiredPhotos
                     ? 'border-primary-400 text-primary-600 bg-primary-50 hover:bg-primary-100'
                     : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                 }`}>
-                <Camera className="w-4 h-4" />
-                {localPhotos.length > 0 ? 'Add Another Photo' : 'Open Camera'}
-                {photosRequired && localPhotos.length < requiredPhotos && (
-                  <span className="ml-auto text-xs font-bold text-primary-600">
-                    {requiredPhotos - localPhotos.length} more needed
-                  </span>
-                )}
-              </button>
+                  <FileText className="w-4 h-4" /> Upload Photos
+                  <input type="file" accept="image/*" multiple className="sr-only"
+                    onChange={e => { handlePhotoUpload(e.target.files); e.target.value = ''; }} />
+                </label>
+              </div>
             </section>
           )}
 
@@ -601,18 +610,19 @@ export function CheckInPage() {
                 </div>
               )}
 
-              <button
-                onClick={() => setShowVideoRecorder(true)}
-                className={`flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl border w-full justify-center mt-3 transition-colors ${
-                  localVideo
-                    ? 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                    : videoRequired
-                      ? 'border-primary-400 text-primary-600 bg-primary-50 hover:bg-primary-100'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <button type="button" onClick={() => setShowVideoRecorder(true)}
+                  className="flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 justify-center hover:bg-gray-50">
+                  <Video className="w-4 h-4" /> {localVideo ? 'Re-record' : 'Record Video'}
+                </button>
+                <label className={`flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border justify-center cursor-pointer ${
+                  !localVideo && videoRequired ? 'border-primary-400 text-primary-600 bg-primary-50 hover:bg-primary-100' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                 }`}>
-                <Video className="w-4 h-4" />
-                {localVideo ? 'Re-record Video' : 'Open Camera & Record'}
-              </button>
+                  <FileText className="w-4 h-4" /> Upload Video
+                  <input type="file" accept="video/*" className="sr-only"
+                    onChange={e => { handleVideoUpload(e.target.files?.[0]); e.target.value = ''; }} />
+                </label>
+              </div>
             </section>
           )}
 
@@ -680,12 +690,12 @@ export function CheckInPage() {
           </div>
           <div className="bg-white border-t border-gray-200 p-4">
             <button
-              onClick={canSubmit ? handleSubmit : handleDisabledSubmit}
-              disabled={submitting}
+              onClick={handleSubmit}
+              disabled={!canSubmit || submitting}
               className={`w-full py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${
                 canSubmit
                   ? 'bg-success-600 hover:bg-success-700 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-400 cursor-pointer'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }`}
             >
               <Check className="w-5 h-5" />
