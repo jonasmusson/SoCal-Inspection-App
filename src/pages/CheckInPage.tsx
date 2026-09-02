@@ -26,6 +26,7 @@ interface SuccessData {
   vehicleModel: string;
   customerName: string;
   techName: string | null;
+  warnings: string[];
 }
 
 const DEFAULT_CONFIG: CheckinConfig = { photosMode: 'required', videoMode: 'optional', notesMode: 'optional' };
@@ -193,31 +194,36 @@ export function CheckInPage() {
       await supabase.from('inspection_items').insert(allItems);
     }
 
-    // Fire-and-forget: photos, video, and notification don't block the success screen
-    Promise.all(localPhotos.map(async (p, idx) => {
+    const warnings: string[] = [];
+
+    const photoResults = await Promise.all(localPhotos.map(async (p, idx) => {
       const fileName = `${inspection.id}/${Date.now()}_${idx}.jpg`;
       const { error: upErr } = await supabase.storage.from('checkin-photos').upload(fileName, p.file, { contentType: 'image/jpeg' });
-      if (!upErr) {
-        const { data: { publicUrl } } = supabase.storage.from('checkin-photos').getPublicUrl(fileName);
-        await supabase.from('checkin_photos').insert({ inspection_id: inspection.id, photo_url: publicUrl });
-      }
+      if (upErr) return false;
+      const { data: { publicUrl } } = supabase.storage.from('checkin-photos').getPublicUrl(fileName);
+      const { error: recordError } = await supabase.from('checkin_photos').insert({ inspection_id: inspection.id, photo_url: publicUrl });
+      return !recordError;
     }));
+    if (photoResults.some(result => !result)) warnings.push('One or more check-in photos could not be saved.');
 
     if (localVideo) {
       const ext = localVideo.name.split('.').pop() || 'webm';
       const fileName = `${inspection.id}/${Date.now()}.${ext}`;
-      supabase.storage.from('checkin-videos').upload(fileName, localVideo, { contentType: localVideo.type }).then(({ error: vErr }) => {
-        if (!vErr) {
-          const { data: { publicUrl } } = supabase.storage.from('checkin-videos').getPublicUrl(fileName);
-          supabase.from('inspections').update({ checkin_video_url: publicUrl }).eq('id', inspection.id);
-        }
-      });
+      const { error: videoUploadError } = await supabase.storage.from('checkin-videos').upload(fileName, localVideo, { contentType: localVideo.type });
+      if (videoUploadError) {
+        warnings.push('The walk-around video could not be saved.');
+      } else {
+        const { data: { publicUrl } } = supabase.storage.from('checkin-videos').getPublicUrl(fileName);
+        const { error: videoRecordError } = await supabase.from('inspections').update({ checkin_video_url: publicUrl }).eq('id', inspection.id);
+        if (videoRecordError) warnings.push('The walk-around video could not be linked to the inspection.');
+      }
     }
 
     if (assignedTechId) {
       const tech = staff.find(s => s.id === assignedTechId);
       if (tech?.role === 'tech') {
-        supabase.functions.invoke('notify-tech-assignment', { body: { inspectionId: inspection.id, techId: assignedTechId } });
+        const { data: notificationResult, error: notificationError } = await supabase.functions.invoke('notify-tech-assignment', { body: { inspectionId: inspection.id, techId: assignedTechId } });
+        if (notificationError || notificationResult?.emailSent !== true) warnings.push('Inspection saved, but the technician assignment email was not delivered.');
       }
     }
 
@@ -230,6 +236,7 @@ export function CheckInPage() {
       vehicleModel: form.vehicle_model,
       customerName: `${form.customer_first_name} ${form.customer_last_name}`.trim(),
       techName: tech ? (tech.first_name || tech.full_name?.split(' ')[0] || null) : null,
+      warnings,
     });
   }
 
@@ -295,6 +302,11 @@ export function CheckInPage() {
                   </div>
                 )}
               </div>
+              {success.warnings.length > 0 && (
+                <div className="p-3 bg-warning-50 border border-warning-200 rounded-xl text-xs text-warning-700 space-y-1">
+                  {success.warnings.map(warning => <p key={warning}>{warning}</p>)}
+                </div>
+              )}
               <button
                 onClick={() => navigate('/dashboard')}
                 className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2">
