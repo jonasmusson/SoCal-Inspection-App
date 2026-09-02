@@ -153,6 +153,7 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
 }
 
 export function SignupPage({ onShowLogin }: SignupPageProps) {
+  const OWNER_EMAIL = 'jonasmusson@gmail.com';
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -167,30 +168,27 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      setError('Choose at least 12 characters with an uppercase letter, lowercase letter, number, and symbol. Avoid common words or reused passwords.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
+      email: email.trim().toLowerCase(),
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName, first_name: firstName.trim(), last_name: lastName.trim() } },
     });
     if (signUpError) { setError(signUpError.message); setLoading(false); return; }
     if (data.user) {
-      const { error: profileError } = await supabase.from('user_profiles').insert({
-        id: data.user.id,
-        email,
-        full_name: fullName,
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        role: 'tech',
-        status: 'pending',
-      });
-      if (profileError) { setError(profileError.message); setLoading(false); return; }
+      // The database trigger creates the profile. It automatically activates the
+      // designated owner and leaves every other new account pending approval.
       // Fire-and-forget — don't block the UI on email delivery
-      supabase.functions.invoke('send-signup-confirmation', { body: { userId: data.user.id } });
+      if (email.trim().toLowerCase() !== OWNER_EMAIL) {
+        supabase.functions.invoke('send-signup-confirmation', { body: { userId: data.user.id } });
+      }
       setSubmitted(true);
     }
   };
@@ -202,10 +200,16 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success-100 mb-4">
             <CheckCircle className="w-8 h-8 text-success-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">Thanks for signing up!</h2>
-          <p className="text-gray-600 mb-2">Your request has been submitted and is pending approval.</p>
-          <p className="text-gray-500 text-sm">A manager or owner will review your request shortly. You'll receive a welcome email at <strong className="text-gray-700">{email}</strong> once your account is approved.</p>
-          <button onClick={onShowLogin} className="mt-8 text-primary-600 font-medium hover:underline text-sm">Back to Sign In</button>
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">{email.trim().toLowerCase() === OWNER_EMAIL ? 'Owner account created' : 'Access request submitted'}</h2>
+          {email.trim().toLowerCase() === OWNER_EMAIL ? (
+            <p className="text-gray-500 text-sm">Your Owner account is activated automatically. You can sign in now with <strong className="text-gray-700">{email}</strong>.</p>
+          ) : (
+            <>
+              <p className="text-gray-600 mb-2">Your account is pending approval.</p>
+              <p className="text-gray-500 text-sm">A manager or owner will review your request. You'll receive a welcome email at <strong className="text-gray-700">{email}</strong> once approved.</p>
+            </>
+          )}
+          <button onClick={onShowLogin} className="mt-8 text-primary-600 font-medium hover:underline text-sm">{email.trim().toLowerCase() === OWNER_EMAIL ? 'Continue to Sign In' : 'Back to Sign In'}</button>
         </div>
       </div>
     );
@@ -257,12 +261,15 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                  placeholder="Min. 6 characters" required minLength={6} />
+                  placeholder="Create a secure password" required minLength={12} />
                 <button type="button" onClick={() => setShowPass(p => !p)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              <p className="mt-2 text-xs text-gray-500 leading-relaxed">
+                Use 12+ characters with uppercase and lowercase letters, a number, and a symbol. Avoid common words and passwords used on other sites.
+              </p>
             </div>
 
             <div>
@@ -287,7 +294,7 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
 
             <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
               <p className="text-xs text-blue-700 leading-relaxed">
-                Your request will be reviewed by a manager or owner. You'll receive a welcome email once your account is approved.
+                The designated Owner account is activated automatically. All other accounts require approval from an Owner or Manager.
               </p>
             </div>
 
