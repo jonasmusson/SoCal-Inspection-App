@@ -3,19 +3,21 @@
 --    (inline EXISTS so we can fully revoke the function)
 -- ============================================================
 DROP POLICY IF EXISTS managers_update_all ON user_profiles;
+DROP POLICY IF EXISTS users_update_own ON user_profiles;
+DROP POLICY IF EXISTS users_insert_own ON user_profiles;
 
 CREATE POLICY managers_update_all ON user_profiles FOR UPDATE
   TO authenticated
   USING (
     EXISTS (
       SELECT 1 FROM user_profiles up
-      WHERE up.id = auth.uid() AND up.role IN ('manager', 'owner')
+      WHERE up.id = auth.uid() AND up.role IN ('manager', 'owner') AND up.status = 'active'
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM user_profiles up
-      WHERE up.id = auth.uid() AND up.role IN ('manager', 'owner')
+      WHERE up.id = auth.uid() AND up.role IN ('manager', 'owner') AND up.status = 'active'
     )
   );
 
