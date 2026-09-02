@@ -23,6 +23,7 @@ export function SettingsPage() {
   const [emailSaved, setEmailSaved] = useState(false);
   const [editSubject, setEditSubject] = useState('');
   const [editBody, setEditBody] = useState('');
+  const [deliveryNotice, setDeliveryNotice] = useState<string | null>(null);
 
   // Shop settings
   const [shopSettings, setShopSettings] = useState<Record<string, string>>({});
@@ -61,9 +62,20 @@ export function SettingsPage() {
 
   async function approveUser(user: UserProfile) {
     setApprovingId(user.id);
+    setDeliveryNotice(null);
     const role = pendingRoles[user.id] ?? 'tech';
-    await supabase.from('user_profiles').update({ status: 'active', role }).eq('id', user.id);
-    await supabase.functions.invoke('send-welcome-email', { body: { userId: user.id } });
+    const { error: updateError } = await supabase.from('user_profiles').update({ status: 'active', role }).eq('id', user.id);
+    if (updateError) {
+      setDeliveryNotice(`Account approval failed: ${updateError.message}`);
+      setApprovingId(null);
+      return;
+    }
+    const { data: emailResult, error: emailError } = await supabase.functions.invoke('send-welcome-email', { body: { userId: user.id } });
+    if (emailError || emailResult?.emailSent !== true) {
+      setDeliveryNotice('Account approved, but the welcome email was not delivered. Check the deployed email function and RESEND_API_KEY configuration.');
+    } else {
+      setDeliveryNotice(`Account approved and welcome email sent to ${user.email}.`);
+    }
     setPendingUsers(prev => prev.filter(u => u.id !== user.id));
     setActiveUsers(prev => [...prev, { ...user, status: 'active' as const, role }].sort((a, b) => a.full_name.localeCompare(b.full_name)));
     setApprovingId(null);
@@ -115,6 +127,12 @@ export function SettingsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500 mt-1">Manage your team and notifications</p>
       </div>
+
+      {deliveryNotice && (
+        <div className={`mb-4 rounded-xl border p-3 text-sm ${deliveryNotice.includes('sent to') ? 'bg-success-50 border-success-200 text-success-700' : 'bg-warning-50 border-warning-200 text-warning-700'}`}>
+          {deliveryNotice}
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-5">
