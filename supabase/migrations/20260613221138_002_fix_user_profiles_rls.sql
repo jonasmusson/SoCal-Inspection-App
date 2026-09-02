@@ -9,13 +9,8 @@ DROP POLICY IF EXISTS "managers_view_all" ON user_profiles;
 CREATE POLICY "users_select_own" ON user_profiles FOR SELECT
   TO authenticated USING (auth.uid() = id);
 
--- Users can update their own profile
-CREATE POLICY "users_update_own" ON user_profiles FOR UPDATE
-  TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-
--- Users can insert their own profile
-CREATE POLICY "users_insert_own" ON user_profiles FOR INSERT
-  TO authenticated WITH CHECK (auth.uid() = id);
+-- Profiles are inserted by the auth trigger. Users must never be allowed to
+-- assign their own role or approve their own account.
 
 -- Use a security definer function to check role without recursion
 CREATE OR REPLACE FUNCTION is_manager_or_owner()
