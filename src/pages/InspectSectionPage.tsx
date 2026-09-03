@@ -143,14 +143,20 @@ export function InspectSectionPage() {
     await supabase.from('inspection_items').update({ notes: note }).eq('id', itemId);
   }
 
+  async function uploadPhoto(file: File, itemId: string) {
+    await autoResume();
+    const ext = file.name.split('.').pop() || 'jpg';
+    const fileName = `${id}/${itemId}/${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from('inspection-photos').upload(fileName, file, { contentType: file.type });
+    if (uploadError) return;
+    const { data: { publicUrl } } = supabase.storage.from('inspection-photos').getPublicUrl(fileName);
+    const { error: recordError } = await supabase.from('inspection_photos').insert({ item_id: itemId, photo_url: publicUrl });
+    if (!recordError) setPhotoCounts(prev => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }));
+  }
+
   async function capturePhoto(file: File) {
     if (!activeItem) return;
-    await autoResume();
-    const fileName = `${id}/${activeItem}/${Date.now()}.jpg`;
-    await supabase.storage.from('inspection-photos').upload(fileName, file);
-    const { data: { publicUrl } } = supabase.storage.from('inspection-photos').getPublicUrl(fileName);
-    await supabase.from('inspection_photos').insert({ item_id: activeItem, photo_url: publicUrl });
-    setPhotoCounts(prev => ({ ...prev, [activeItem!]: (prev[activeItem!] || 0) + 1 }));
+    await uploadPhoto(file, activeItem);
     setShowCamera(false);
     setActiveItem(null);
   }
@@ -195,7 +201,8 @@ export function InspectSectionPage() {
     if (sectionNum === totalSections) {
       const completedAt = new Date().toISOString();
       await supabase.from('inspections').update({
-        status: 'pending_review', completed_at: completedAt, work_completed_at: completedAt,
+        status: 'pending_review', progress_percent: 100,
+        completed_at: completedAt, work_completed_at: completedAt,
       }).eq('id', id);
       navigate(`/inspection/${id}`);
     } else {
@@ -312,16 +319,26 @@ export function InspectSectionPage() {
               {(showPhoto || showVideo) && (
                 <div className="mt-3 flex items-center gap-3 flex-wrap">
                   {showPhoto && (
-                    <button
-                      onClick={() => { setActiveItem(item.id); setShowCamera(true); }}
-                      className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                        photoMissing && item.status ? 'bg-danger-50 text-danger-600 border border-danger-200'
-                          : photoCount > 0 ? 'bg-success-50 text-success-700 border border-success-200'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}>
-                      <Camera className="w-4 h-4" />
-                      {photoCount > 0 ? `${photoCount} photo${photoCount > 1 ? 's' : ''}` : item.photo_mode === 'required' ? 'Add Photo*' : 'Add Photo'}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => { setActiveItem(item.id); setShowCamera(true); }}
+                        className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                          photoMissing && item.status ? 'bg-danger-50 text-danger-600 border border-danger-200'
+                            : photoCount > 0 ? 'bg-success-50 text-success-700 border border-success-200'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}>
+                        <Camera className="w-4 h-4" />
+                        {photoCount > 0 ? `${photoCount} photo${photoCount > 1 ? 's' : ''}` : item.photo_mode === 'required' ? 'Take Photo*' : 'Take Photo'}
+                      </button>
+                      <label className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer">
+                        Upload Photo
+                        <input type="file" accept="image/*" className="sr-only" onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) void uploadPhoto(file, item.id);
+                          e.target.value = '';
+                        }} />
+                      </label>
+                    </>
                   )}
 
                   {showVideo && (
