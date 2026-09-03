@@ -96,10 +96,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
-          await loadProfile(newSession.user.id);
+          // Supabase invokes auth callbacks while holding its internal auth lock.
+          // Starting another Supabase request and awaiting it here can deadlock
+          // signInWithPassword, leaving the login button stuck indefinitely.
+          setLoading(true);
+          const userId = newSession.user.id;
+          setTimeout(async () => {
+            if (!mounted) return;
+            await loadProfile(userId);
+            if (mounted) setLoading(false);
+          }, 0);
         } else {
           setProfile(null);
           setProfileError(false);
+          setLoading(false);
         }
       }
     );
