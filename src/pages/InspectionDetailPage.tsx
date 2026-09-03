@@ -9,6 +9,7 @@ import { laborSeconds, formatLaborTime } from '../lib/laborTime';
 import { VEHICLE_COLORS } from '../data/vehicleColors';
 import { Car, User, Phone, Mail, MapPin, Play, Check, AlertTriangle, Eye, Clock, UserCheck, ChevronDown, Image, Video as VideoIcon, Trash2, Archive, MoreVertical, X, Pause, Timer } from 'lucide-react';
 import { format } from 'date-fns';
+import { withTimeout } from '../lib/async';
 
 export function InspectionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +23,7 @@ export function InspectionDetailPage() {
   const [assigningTo, setAssigningTo] = useState<string>('');
   const [assigning, setAssigning] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -48,29 +50,34 @@ export function InspectionDetailPage() {
 
   async function loadAll(inspectionId: string) {
     setLoading(true);
-    const [{ data: insp }, { data: secs }, { data: photos }] = await Promise.all([
-      supabase.from('inspections').select('*').eq('id', inspectionId).single(),
-      supabase.from('inspection_sections').select('*').eq('inspection_id', inspectionId).order('section_number'),
-      supabase.from('checkin_photos').select('photo_url').eq('inspection_id', inspectionId),
-    ]);
-    setInspection(insp || null);
-    setSections(secs || []);
-    setCheckinPhotos(photos || []);
+    setLoadError(false);
+    try {
+      const [{ data: insp }, { data: secs }, { data: photos }] = await withTimeout(Promise.all([
+        supabase.from('inspections').select('*').eq('id', inspectionId).single(),
+        supabase.from('inspection_sections').select('*').eq('inspection_id', inspectionId).order('section_number'),
+        supabase.from('checkin_photos').select('photo_url').eq('inspection_id', inspectionId),
+      ]));
+      setInspection(insp || null);
+      setSections(secs || []);
+      setCheckinPhotos(photos || []);
 
-    if (insp?.assigned_tech_id) {
-      const { data: tech } = await supabase.from('user_profiles').select('*').eq('id', insp.assigned_tech_id).single();
-      setAssignedTech(tech || null);
+      if (insp?.assigned_tech_id) {
+        const { data: tech } = await supabase.from('user_profiles').select('*').eq('id', insp.assigned_tech_id).single();
+        setAssignedTech(tech || null);
+      }
+
+      if (isManager || isOwner) {
+        const { data: staffData } = await supabase
+          .from('user_profiles').select('*')
+          .eq('role', 'tech').eq('status', 'active').order('full_name');
+        setStaff(staffData || []);
+        if (insp && !insp.assigned_tech_id) setAssigningTo(profile?.id || '');
+      }
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-
-    if (isManager || isOwner) {
-      const { data: staffData } = await supabase
-        .from('user_profiles').select('*')
-        .eq('role', 'tech').eq('status', 'active').order('full_name');
-      setStaff(staffData || []);
-      if (insp && !insp.assigned_tech_id) setAssigningTo(profile?.id || '');
-    }
-
-    setLoading(false);
   }
 
   async function assignInspection() {
@@ -136,6 +143,16 @@ export function InspectionDetailPage() {
   }
 
   if (loading) return <div className="p-4 text-center text-gray-500">Loading...</div>;
+  if (loadError) return (
+    <div className="p-4 text-center py-12">
+      <AlertTriangle className="w-12 h-12 text-danger-300 mx-auto mb-3" />
+      <p className="text-gray-600 mb-4">Unable to load inspection details. Check your connection and try again.</p>
+      <button onClick={() => id && loadAll(id)}
+        className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl">
+        Try Again
+      </button>
+    </div>
+  );
   if (!inspection) return <div className="p-4 text-center text-gray-500">Not found</div>;
 
   const canArchive = (isOwner || isManager) && inspection.status === 'sent' && !inspection.archived;

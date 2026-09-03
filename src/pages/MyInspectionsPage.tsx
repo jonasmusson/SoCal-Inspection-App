@@ -4,15 +4,17 @@ import { useAuth } from '../hooks/useAuth';
 import { Inspection, STATUS_LABELS } from '../types';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ProgressBar } from '../components/common/ProgressBar';
-import { Clock, Car, Pause } from 'lucide-react';
+import { Clock, Car, Pause, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { withTimeout } from '../lib/async';
 
 export function MyInspectionsPage() {
   const { profile, isManager } = useAuth();
   const navigate = useNavigate();
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => { loadInspections(); }, [profile, statusFilter]);
@@ -20,12 +22,18 @@ export function MyInspectionsPage() {
   async function loadInspections() {
     if (!profile) { setLoading(false); return; }
     setLoading(true);
-    let query = supabase.from('inspections').select('*').eq('archived', false).order('created_at', { ascending: false });
-    if (!isManager) query = query.eq('assigned_tech_id', profile.id);
-    if (statusFilter !== 'all') query = query.eq('status', statusFilter);
-    const { data } = await query;
-    setInspections(data || []);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      let query = supabase.from('inspections').select('*').eq('archived', false).order('created_at', { ascending: false });
+      if (!isManager) query = query.eq('assigned_tech_id', profile.id);
+      if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+      const { data } = await withTimeout(query);
+      setInspections(data || []);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleCardClick(i: Inspection) {
@@ -54,6 +62,16 @@ export function MyInspectionsPage() {
       </div>
 
       {loading ? <div className="text-center py-8 text-gray-500">Loading...</div> :
+        loadError ? (
+          <div className="text-center py-12">
+            <AlertTriangle className="w-12 h-12 text-danger-300 mx-auto mb-3" />
+            <p className="text-gray-600 mb-4">Unable to load your inspections. Check your connection and try again.</p>
+            <button onClick={() => loadInspections()}
+              className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl">
+              Try Again
+            </button>
+          </div>
+        ) :
         inspections.length === 0 ? (
           <div className="text-center py-12">
             <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />

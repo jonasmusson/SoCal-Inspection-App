@@ -4,9 +4,10 @@ import { useAuth } from '../hooks/useAuth';
 import { Inspection } from '../types';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ProgressBar } from '../components/common/ProgressBar';
-import { Plus, Search, Car, AlertCircle, Clock, CheckCircle, Archive } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Car, AlertCircle, Clock, CheckCircle, Archive, AlertTriangle } from 'lucide-react';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { withTimeout } from '../lib/async';
 
 export function DashboardPage() {
   const { profile, isManager, isOwner } = useAuth();
@@ -14,6 +15,7 @@ export function DashboardPage() {
   const [inspections, setInspections] = useState<Inspection[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
@@ -25,13 +27,19 @@ export function DashboardPage() {
 
   async function loadInspections() {
     setLoading(true);
-    let query = supabase.from('inspections').select('*').order('created_at', { ascending: false });
-    query = query.eq('archived', showArchived);
-    if (!showArchived && statusFilter !== 'all') query = query.eq('status', statusFilter);
-    if (search) query = query.or(`customer_first_name.ilike.%${search}%,customer_last_name.ilike.%${search}%,vehicle_make.ilike.%${search}%,vehicle_model.ilike.%${search}%`);
-    const { data } = await query;
-    setInspections(data || []);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      let query = supabase.from('inspections').select('*').order('created_at', { ascending: false });
+      query = query.eq('archived', showArchived);
+      if (!showArchived && statusFilter !== 'all') query = query.eq('status', statusFilter);
+      if (search) query = query.or(`customer_first_name.ilike.%${search}%,customer_last_name.ilike.%${search}%,vehicle_make.ilike.%${search}%,vehicle_model.ilike.%${search}%`);
+      const { data } = await withTimeout(query);
+      setInspections(data || []);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const stats = {
@@ -42,7 +50,7 @@ export function DashboardPage() {
   };
 
   if (!profile) return null;
-  if (!isManager && !isOwner) { navigate('/my-inspections'); return null; }
+  if (!isManager && !isOwner) return <Navigate to="/my-inspections" replace />;
 
   return (
     <div className="p-4 pb-24">
@@ -105,6 +113,16 @@ export function DashboardPage() {
       )}
 
       {loading ? <div className="text-center py-8 text-gray-500">Loading...</div> :
+        loadError ? (
+          <div className="text-center py-12">
+            <AlertTriangle className="w-12 h-12 text-danger-300 mx-auto mb-3" />
+            <p className="text-gray-600 mb-4">Unable to load inspections. Check your connection and try again.</p>
+            <button onClick={() => loadInspections()}
+              className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl">
+              Try Again
+            </button>
+          </div>
+        ) :
         inspections.length === 0 ? (
           <div className="text-center py-12">
             <Archive className="w-12 h-12 text-gray-300 mx-auto mb-3" />

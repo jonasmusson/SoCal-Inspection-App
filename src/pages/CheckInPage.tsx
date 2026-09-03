@@ -8,8 +8,9 @@ import { VEHICLE_COLORS } from '../data/vehicleColors';
 import { CameraView, VideoRecorderView, SectionHelp } from '../components/common/CameraComponents';
 import {
   ArrowLeft, Camera, Video, X, Check, ChevronRight, User, Car,
-  FileText, Users, AlertCircle, Palette, CheckCircle, ClipboardList,
+  FileText, Users, AlertCircle, Palette, CheckCircle, ClipboardList, AlertTriangle,
 } from 'lucide-react';
+import { withTimeout } from '../lib/async';
 
 interface LocalPhoto { file: File; preview: string; }
 
@@ -41,6 +42,7 @@ export function CheckInPage() {
   const [requiredPhotos, setRequiredPhotos] = useState(3);
   const [checkinConfig, setCheckinConfig] = useState<CheckinConfig>(DEFAULT_CONFIG);
   const [initLoading, setInitLoading] = useState(true);
+  const [initError, setInitError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<SuccessData | null>(null);
@@ -64,18 +66,25 @@ export function CheckInPage() {
   useEffect(() => { if (form.template_id) loadCheckinConfig(form.template_id); }, [form.template_id]);
 
   async function loadInit() {
-    const [{ data: tmplData }, { data: staffData }, { data: settingsData }] = await Promise.all([
-      supabase.from('inspection_templates').select('*').eq('is_active', true).order('sort_order'),
-      supabase.from('user_profiles').select('*').eq('status', 'active').order('full_name'),
-      supabase.from('shop_settings').select('key, value'),
-    ]);
-    if (tmplData?.length) { setTemplates(tmplData); setForm(f => ({ ...f, template_id: tmplData[0].id })); }
-    if (staffData) setStaff(staffData as UserProfile[]);
-    if (settingsData) {
-      const get = (k: string) => settingsData.find((setting: { key: string; value: string }) => setting.key === k)?.value;
-      if (get('checkin_required_photos')) setRequiredPhotos(parseInt(get('checkin_required_photos')!));
+    setInitLoading(true);
+    setInitError(false);
+    try {
+      const [{ data: tmplData }, { data: staffData }, { data: settingsData }] = await withTimeout(Promise.all([
+        supabase.from('inspection_templates').select('*').eq('is_active', true).order('sort_order'),
+        supabase.from('user_profiles').select('*').eq('status', 'active').order('full_name'),
+        supabase.from('shop_settings').select('key, value'),
+      ]));
+      if (tmplData?.length) { setTemplates(tmplData); setForm(f => ({ ...f, template_id: tmplData[0].id })); }
+      if (staffData) setStaff(staffData as UserProfile[]);
+      if (settingsData) {
+        const get = (k: string) => settingsData.find((setting: { key: string; value: string }) => setting.key === k)?.value;
+        if (get('checkin_required_photos')) setRequiredPhotos(parseInt(get('checkin_required_photos')!));
+      }
+    } catch {
+      setInitError(true);
+    } finally {
+      setInitLoading(false);
     }
-    setInitLoading(false);
   }
 
   async function loadCheckinConfig(templateId: string) {
@@ -275,6 +284,16 @@ export function CheckInPage() {
   const modelOptions = getModelsForMakeYear(form.vehicle_make, form.vehicle_year);
 
   if (initLoading) return <div className="p-4 text-center text-gray-500">Loading...</div>;
+  if (initError) return (
+    <div className="p-4 text-center py-12">
+      <AlertTriangle className="w-12 h-12 text-danger-300 mx-auto mb-3" />
+      <p className="text-gray-600 mb-4">Unable to load the check-in form. Check your connection and try again.</p>
+      <button onClick={() => loadInit()}
+        className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl">
+        Try Again
+      </button>
+    </div>
+  );
 
   if (success) {
     return (

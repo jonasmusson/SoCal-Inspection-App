@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode } fro
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
+import { withTimeout } from '../lib/async';
 
 interface AuthContextType {
   user: User | null;
@@ -22,20 +23,24 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 async function fetchProfile(userId: string): Promise<UserProfile | null> {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error) console.error('fetchProfile error:', error.message, error.code, error.details);
-  return data ?? null;
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle(),
+      8000,
+      'Profile load timed out',
+    );
+    if (error) console.error('fetchProfile error:', error.message, error.code, error.details);
+    return data ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchProfileWithRetry(userId: string): Promise<UserProfile | null> {
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     const data = await fetchProfile(userId);
     if (data) return data;
-    if (attempt < 3) await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+    if (attempt < 1) await new Promise(r => setTimeout(r, 600));
   }
   return null;
 }

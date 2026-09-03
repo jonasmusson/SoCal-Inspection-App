@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Inspection, InspectionSection, InspectionItem, InspectionPhoto, ItemCondition, PriorityLevel } from '../types';
 import { VEHICLE_COLORS } from '../data/vehicleColors';
 import { ArrowLeft, Check, AlertTriangle, Eye, Send, Eye as Preview, ClipboardList, MinusCircle, Printer, Save } from 'lucide-react';
+import { withTimeout } from '../lib/async';
 
 const PRIORITY_OPTIONS: { value: PriorityLevel; label: string; color: string; bg: string }[] = [
   { value: 'immediate',  label: 'Immediate',   color: 'text-danger-700',  bg: 'bg-danger-100 border-danger-300'  },
@@ -29,6 +30,7 @@ export function ReviewInspectionPage() {
   const [sections, setSections] = useState<InspectionSection[]>([]);
   const [items, setItems] = useState<InspectionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
 
@@ -46,28 +48,42 @@ export function ReviewInspectionPage() {
 
   async function loadInspection(inspectionId: string) {
     setLoading(true);
-    const { data } = await supabase.from('inspections').select('*').eq('id', inspectionId).single();
-    if (data) {
-      setInspection(data);
-      setOverall(data.overall_condition);
-      setGuidance(data.investment_guidance || '');
-      setManagerNotes(data.manager_notes || '');
-      setExecutiveSummary(data.executive_summary || ''); setPrimaryRecommendation(data.primary_recommendation || '');
-      const { data: secData } = await supabase
-        .from('inspection_sections').select('*').eq('inspection_id', inspectionId).order('section_number');
-      setSections(secData || []);
-      if (secData?.length) {
-        const { data: itemData } = await supabase
-          .from('inspection_items').select('*').in('section_id', secData.map(s => s.id)).order('created_at');
-        const loaded = itemData || [];
-        setItems(loaded);
-        const p: Record<string, PriorityLevel> = {};
-        loaded.forEach(i => { if (i.priority) p[i.id] = i.priority as PriorityLevel; });
-        setPriorities(p);
-        const { data: photoData } = await supabase.from('inspection_photos').select('*').in('item_id', loaded.map(i=>i.id)); setPhotos(photoData || []);
+    setLoadError(false);
+    try {
+      const { data } = await withTimeout(
+        supabase.from('inspections').select('*').eq('id', inspectionId).single(),
+      );
+      if (data) {
+        setInspection(data);
+        setOverall(data.overall_condition);
+        setGuidance(data.investment_guidance || '');
+        setManagerNotes(data.manager_notes || '');
+        setExecutiveSummary(data.executive_summary || ''); setPrimaryRecommendation(data.primary_recommendation || '');
+        const { data: secData } = await supabase
+          .from('inspection_sections').select('*').eq('inspection_id', inspectionId).order('section_number');
+        setSections(secData || []);
+        if (secData?.length) {
+          const { data: itemData } = await supabase
+            .from('inspection_items').select('*').in('section_id', secData.map(s => s.id)).order('created_at');
+          const loaded = itemData || [];
+          setItems(loaded);
+          const p: Record<string, PriorityLevel> = {};
+          loaded.forEach(i => { if (i.priority) p[i.id] = i.priority as PriorityLevel; });
+          setPriorities(p);
+          if (loaded.length > 0) {
+            const { data: photoData } = await supabase.from('inspection_photos').select('*').in('item_id', loaded.map(i=>i.id)); setPhotos(photoData || []);
+          } else {
+            setPhotos([]);
+          }
+        } else {
+          setPhotos([]);
+        }
       }
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   function setPriority(itemId: string, p: PriorityLevel) {
@@ -174,6 +190,16 @@ export function ReviewInspectionPage() {
   }
 
   if (loading) return <div className="p-4 text-center text-gray-500">Loading...</div>;
+  if (loadError) return (
+    <div className="p-4 text-center py-12">
+      <AlertTriangle className="w-12 h-12 text-danger-300 mx-auto mb-3" />
+      <p className="text-gray-600 mb-4">Unable to load the inspection for review. Check your connection and try again.</p>
+      <button onClick={() => id && loadInspection(id)}
+        className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl">
+        Try Again
+      </button>
+    </div>
+  );
   if (!inspection) return <div className="p-4 text-center text-gray-500">Not found</div>;
 
   const needsAttention = items.filter(i => i.status === 'needs_attention');
