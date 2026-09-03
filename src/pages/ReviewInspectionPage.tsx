@@ -97,37 +97,61 @@ export function ReviewInspectionPage() {
     alert('Review draft saved.');
   }
 
-  async function approveAndSend() {
-    if (!inspection || !overall) return;
+  function validateReport() {
+    if (!inspection || !overall) return false;
     const attentionItems = items.filter(item => item.status === 'needs_attention');
     const missingPriority = attentionItems.find(item => !priorities[item.id]);
     if (!executiveSummary.trim()) {
-      alert('Add an Executive Summary before sending the customer report.');
-      return;
+      alert('Add an Executive Summary before approving the customer report.');
+      return false;
     }
     if (attentionItems.length > 0 && !primaryRecommendation.trim()) {
-      alert('Add a Recommended Next Step before sending a report with items requiring attention.');
-      return;
+      alert('Add a Recommended Next Step before approving a report with items requiring attention.');
+      return false;
     }
     if (missingPriority) {
-      alert(`Set a report priority for ${missingPriority.item_name} before sending.`);
-      return;
+      alert(`Set a report priority for ${missingPriority.item_name} before approving.`);
+      return false;
     }
+    return true;
+  }
+
+  async function approveReport() {
+    if (!inspection || !overall || !validateReport()) return;
     setSaving(true);
 
-    // Persist per-item priorities
     const updates = Object.entries(priorities).map(([itemId, p]) =>
       supabase.from('inspection_items').update({ priority: p }).eq('id', itemId)
     );
-    await Promise.all(updates);
+    const priorityResults = await Promise.all(updates);
 
-    await supabase.from('inspections').update({
+    const { error: approvalError } = await supabase.from('inspections').update({
       status: 'approved', overall_condition: overall,
       investment_guidance: guidance || null,
       manager_notes: managerNotes || null,
       executive_summary: executiveSummary || null, primary_recommendation: primaryRecommendation || null,
       report_approved: true, approved_at: new Date().toISOString(),
     }).eq('id', inspection.id);
+
+    if (approvalError || priorityResults.some(result => result.error)) {
+      setSaving(false);
+      alert('The report could not be approved. Please check your connection and try again.');
+      return;
+    }
+
+    setInspection(prev => prev ? { ...prev, status: 'approved', overall_condition: overall, report_approved: true } : prev);
+    setSaving(false);
+    setActiveTab('preview');
+    alert('Report approved. You can print it or save it as a PDF now. Email delivery can be completed later.');
+  }
+
+  async function sendReport() {
+    if (!inspection || !validateReport()) return;
+    if (!inspection.report_approved && inspection.status !== 'approved' && inspection.status !== 'sent') {
+      alert('Approve the report before sending it by email.');
+      return;
+    }
+    setSaving(true);
 
     const { data: fnData, error } = await supabase.functions.invoke('send-inspection-report', { body: { inspectionId: inspection.id } });
     if (error || fnData?.success === false || fnData?.emailSent === false) {
@@ -142,6 +166,7 @@ export function ReviewInspectionPage() {
     await supabase.from('inspections').update({
       status: 'sent', report_sent: true, report_sent_at: new Date().toISOString(),
     }).eq('id', inspection.id);
+    setSaving(false);
     navigate(`/inspection/${inspection.id}`);
   }
 
@@ -320,7 +345,7 @@ export function ReviewInspectionPage() {
           {/* Manager Notes */}
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
             <h2 className="font-semibold text-gray-900 mb-1">Notes to Customer</h2>
-            <p className="text-xs text-gray-400 mb-3">Visible in the report email</p>
+            <p className="text-xs text-gray-400 mb-3">Visible in the customer report</p>
             <textarea value={managerNotes} onChange={e => setManagerNotes(e.target.value)}
               placeholder="Additional context, recommendations, or next steps for the customer..."
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none" rows={4} />
@@ -358,11 +383,14 @@ export function ReviewInspectionPage() {
             className="flex-1 py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50">
             <Save className="w-5 h-5" /> {saving ? 'Saving...' : 'Save Draft'}
           </button>
-          <button onClick={approveAndSend} disabled={!reportReady || saving}
+          <button onClick={inspection.report_approved || inspection.status === 'approved' || inspection.status === 'sent' ? sendReport : approveReport} disabled={!reportReady || saving}
             className={`flex-[2] py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors ${
               reportReady ? 'bg-primary-600 hover:bg-primary-700 text-white' : 'bg-gray-100 text-gray-400'
             }`}>
-            <Send className="w-5 h-5" /> {saving ? 'Working...' : inspection.status === 'sent' ? 'Resend Report' : 'Approve & Send Report'}
+            {inspection.report_approved || inspection.status === 'approved' || inspection.status === 'sent'
+              ? <Send className="w-5 h-5" />
+              : <Check className="w-5 h-5" />}
+            {saving ? 'Working...' : inspection.status === 'sent' ? 'Resend Report Email' : inspection.report_approved || inspection.status === 'approved' ? 'Send Report by Email' : 'Approve Report'}
           </button>
         </div>
       </div>
@@ -416,10 +444,10 @@ function ReportPreview({ inspection, sections, needsAttention, monitor, good, no
 
   return (
     <div className="bg-[#e9e6dc] rounded-2xl p-3 shadow-inner">
-      <p className="text-xs text-gray-500 text-center mb-3 font-medium uppercase tracking-wide">Customer Email Preview</p>
+      <p className="text-xs text-gray-500 text-center mb-3 font-medium uppercase tracking-wide">Customer Report Preview</p>
       <button type="button" onClick={()=>window.print()} className="mx-auto mb-3 flex items-center gap-1.5 text-xs font-semibold text-gray-600"><Printer className="w-4 h-4"/> Print / Save PDF</button>
 
-      <div className="bg-white rounded-xl overflow-hidden shadow-sm">
+      <div className="printable-report bg-white rounded-xl overflow-hidden shadow-sm">
         {/* Header */}
         <div className="bg-gradient-to-br from-[#20251f] to-[#3d463a] px-6 py-8 text-center"><p className="text-xs text-[#d3b56d] uppercase tracking-[0.2em] mb-1">SoCal Autoworks · Comprehensive Inspection</p>
           <h2 className="text-xl font-bold text-white">
@@ -458,7 +486,7 @@ function ReportPreview({ inspection, sections, needsAttention, monitor, good, no
           <div className="grid grid-cols-4 gap-2">{([['Good',good.length,'bg-success-50 text-success-700'],['Monitor',monitor.length,'bg-warning-50 text-warning-700'],['Attention',needsAttention.length,'bg-danger-50 text-danger-700'],['Not inspected',notInspected.length,'bg-gray-50 text-gray-600']] as const).map(([l,n,s])=><div key={l} className={`rounded-lg border p-2 text-center ${s}`}><p className="text-lg font-bold">{n}</p><p className="text-[10px] uppercase">{l}</p></div>)}</div>
           <p className="text-xs text-center text-gray-500">{inspectedCount} items inspected across {sections.length} systems</p>
           {rangedItems.length > 0 && (
-            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <div data-report-card className="rounded-xl border border-stone-200 bg-stone-50 p-4">
               <p className="text-xs font-bold uppercase tracking-widest text-stone-500">Preliminary Repair Planning</p>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div><p className="text-xs text-stone-500">Labor allowance</p><p className="font-semibold text-stone-900">{totalLaborLow}–{totalLaborHigh} hours</p></div>
@@ -467,7 +495,7 @@ function ReportPreview({ inspection, sections, needsAttention, monitor, good, no
               <p className="mt-2 text-[11px] leading-4 text-stone-500">These figures help prioritize next steps and are not a repair authorization or fixed estimate.</p>
             </div>
           )}
-          {executiveSummary && <div className="border-l-4 border-[#b7954f] bg-stone-50 p-4"><p className="text-xs font-bold uppercase tracking-widest text-[#77705f] mb-2">Executive Summary</p><p className="text-sm leading-6 whitespace-pre-line">{executiveSummary}</p></div>}{primaryRecommendation && <div className="rounded-xl bg-[#2f372d] text-white p-4"><p className="text-xs uppercase tracking-widest text-[#d3b56d]">Recommended next step</p><p className="text-sm leading-6">{primaryRecommendation}</p></div>}
+          {executiveSummary && <div data-report-card className="border-l-4 border-[#b7954f] bg-stone-50 p-4"><p className="text-xs font-bold uppercase tracking-widest text-[#77705f] mb-2">Executive Summary</p><p className="text-sm leading-6 whitespace-pre-line">{executiveSummary}</p></div>}{primaryRecommendation && <div data-report-card className="rounded-xl bg-[#2f372d] text-white p-4"><p className="text-xs uppercase tracking-widest text-[#d3b56d]">Recommended next step</p><p className="text-sm leading-6">{primaryRecommendation}</p></div>}
 
           {/* Overall condition */}
           {cond && (
@@ -492,7 +520,7 @@ function ReportPreview({ inspection, sections, needsAttention, monitor, good, no
                   const p = priorities[item.id];
                   const pOpt = PRIORITY_OPTIONS.find(o => o.value === p);
                   return (
-                    <div key={item.id} className="border border-gray-200 rounded-xl p-3">
+                    <div data-report-card key={item.id} className="border border-gray-200 rounded-xl p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="font-semibold text-gray-900 text-sm">{item.item_name}</p>
@@ -535,7 +563,7 @@ function ReportPreview({ inspection, sections, needsAttention, monitor, good, no
                 {monitor.map(item => {
                   const sec = sections.find(s => s.id === item.section_id);
                   return (
-                    <div key={item.id} className="border border-warning-200 rounded-xl px-3 py-2.5 bg-warning-50">
+                    <div data-report-card key={item.id} className="border border-warning-200 rounded-xl px-3 py-2.5 bg-warning-50">
                       <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
                       <p className="text-xs text-gray-400">{sec?.section_name}</p>
                       {item.notes && <p className="text-xs text-gray-600 mt-1">{item.notes}</p>}
