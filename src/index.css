@@ -65,3 +65,38 @@ input::-webkit-inner-spin-button {
 input[type=number] {
   -moz-appearance: textfield;
 }
+
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 0.45in;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .printable-report,
+  .printable-report * {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .printable-report {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .printable-report [data-report-card] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
