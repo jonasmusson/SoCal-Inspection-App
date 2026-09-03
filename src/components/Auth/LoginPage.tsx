@@ -19,9 +19,15 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { setError(error.message); setLoading(false); }
-    else onSuccess();
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setError(error.message);
+      else onSuccess();
+    } catch {
+      setError('Sign-in could not be completed. Check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
