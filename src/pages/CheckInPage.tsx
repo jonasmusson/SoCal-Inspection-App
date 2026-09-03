@@ -151,7 +151,12 @@ export function CheckInPage() {
       checkin_complete: true,
     }).select('id').single();
 
-    if (inspErr || !inspection) { setError('Failed to create inspection. Please try again.'); setSubmitting(false); return; }
+    if (inspErr || !inspection) {
+      console.error('Failed to create inspection:', inspErr);
+      setError('Failed to create inspection. Please try again.');
+      setSubmitting(false);
+      return;
+    }
 
     const { data: tSections, error: tSecErr } = await supabase.from('template_sections')
       .select('id, section_name, sort_order')
