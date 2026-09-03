@@ -20,11 +20,17 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const signIn = supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+      const timeout = new Promise<never>((_, reject) =>
+        window.setTimeout(() => reject(new Error('AUTH_TIMEOUT')), 12000)
+      );
+      const { error } = await Promise.race([signIn, timeout]);
       if (error) setError(error.message);
       else onSuccess();
-    } catch {
-      setError('Sign-in could not be completed. Check your connection and try again.');
+    } catch (err) {
+      setError(err instanceof Error && err.message === 'AUTH_TIMEOUT'
+        ? 'Sign-in timed out. Please try again. If it continues, close other open app tabs and reload.'
+        : 'Sign-in could not be completed. Check your connection and try again.');
     } finally {
       setLoading(false);
     }

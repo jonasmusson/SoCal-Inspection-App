@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState(false);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
-  const initialized = useRef(false);
+  const authGeneration = useRef(0);
 
   const loadProfile = async (userId: string) => {
     const data = await fetchProfileWithRetry(userId);
@@ -65,28 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Use getSession() to initialize — this is the Supabase v2 recommended pattern.
-    // It ensures the HTTP client has the access token set before any DB queries run,
-    // unlike relying on onAuthStateChange alone which can fire before the token propagates.
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      if (!mounted) return;
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-
-      if (initialSession?.user) {
-        await loadProfile(initialSession.user.id);
-      }
-
-      setLoading(false);
-      initialized.current = true;
-    });
-
-    // Listen for subsequent auth changes (sign in, sign out, token refresh)
+    // onAuthStateChange emits INITIAL_SESSION from local storage without competing
+    // for the same cross-tab auth lock as getSession(). Keeping this callback
+    // synchronous also prevents signInWithPassword from waiting on profile I/O.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
+      (event, newSession) => {
         if (!mounted) return;
-        // Skip INITIAL_SESSION — handled by getSession() above
-        if (!initialized.current) return;
 
         if (event === 'PASSWORD_RECOVERY') {
           setIsPasswordRecovery(true);
@@ -96,17 +80,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
-          // Supabase invokes auth callbacks while holding its internal auth lock.
-          // Starting another Supabase request and awaiting it here can deadlock
-          // signInWithPassword, leaving the login button stuck indefinitely.
           setLoading(true);
           const userId = newSession.user.id;
-          setTimeout(async () => {
+          const generation = ++authGeneration.current;
+          window.setTimeout(async () => {
             if (!mounted) return;
             await loadProfile(userId);
-            if (mounted) setLoading(false);
+            if (mounted && generation === authGeneration.current) setLoading(false);
           }, 0);
         } else {
+          authGeneration.current += 1;
           setProfile(null);
           setProfileError(false);
           setLoading(false);
@@ -115,9 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     const timeout = setTimeout(() => {
-      if (!initialized.current && mounted) {
-        setLoading(false);
-      }
+      if (mounted) setLoading(false);
     }, 10000);
 
     return () => {
