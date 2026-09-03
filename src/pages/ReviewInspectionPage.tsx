@@ -39,6 +39,7 @@ export function ReviewInspectionPage() {
   const [executiveSummary, setExecutiveSummary] = useState('');
   const [primaryRecommendation, setPrimaryRecommendation] = useState('');
   const [photos, setPhotos] = useState<InspectionPhoto[]>([]);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => { if (id) loadInspection(id); }, [id]);
   useEffect(() => { if (!isManager && !isOwner) navigate('/'); }, [isManager, isOwner, navigate]);
@@ -75,6 +76,7 @@ export function ReviewInspectionPage() {
 
   async function saveDraft() {
     if (!inspection) return;
+    setFeedback(null);
     setSaving(true);
     const priorityResults = await Promise.all(
       Object.entries(priorities).map(([itemId, priority]) =>
@@ -91,10 +93,10 @@ export function ReviewInspectionPage() {
     }).eq('id', inspection.id);
     setSaving(false);
     if (priorityError || inspectionError) {
-      alert('The review draft could not be saved. Please check your connection and try again.');
+      setFeedback({ type: 'error', message: 'The review draft could not be saved. Please check your connection and try again.' });
       return;
     }
-    alert('Review draft saved.');
+    setFeedback({ type: 'success', message: 'Review draft saved.' });
   }
 
   function validateReport() {
@@ -102,15 +104,15 @@ export function ReviewInspectionPage() {
     const attentionItems = items.filter(item => item.status === 'needs_attention');
     const missingPriority = attentionItems.find(item => !priorities[item.id]);
     if (!executiveSummary.trim()) {
-      alert('Add an Executive Summary before approving the customer report.');
+      setFeedback({ type: 'error', message: 'Add an Executive Summary before approving the customer report.' });
       return false;
     }
     if (attentionItems.length > 0 && !primaryRecommendation.trim()) {
-      alert('Add a Recommended Next Step before approving a report with items requiring attention.');
+      setFeedback({ type: 'error', message: 'Add a Recommended Next Step before approving a report with items requiring attention.' });
       return false;
     }
     if (missingPriority) {
-      alert(`Set a report priority for ${missingPriority.item_name} before approving.`);
+      setFeedback({ type: 'error', message: `Set a report priority for ${missingPriority.item_name} before approving.` });
       return false;
     }
     return true;
@@ -118,6 +120,7 @@ export function ReviewInspectionPage() {
 
   async function approveReport() {
     if (!inspection || !overall || !validateReport()) return;
+    setFeedback(null);
     setSaving(true);
 
     const updates = Object.entries(priorities).map(([itemId, p]) =>
@@ -135,32 +138,32 @@ export function ReviewInspectionPage() {
 
     if (approvalError || priorityResults.some(result => result.error)) {
       setSaving(false);
-      alert('The report could not be approved. Please check your connection and try again.');
+      setFeedback({ type: 'error', message: 'The report could not be approved. Please check your connection and try again.' });
       return;
     }
 
     setInspection(prev => prev ? { ...prev, status: 'approved', overall_condition: overall, report_approved: true } : prev);
     setSaving(false);
     setActiveTab('preview');
-    alert('Report approved. You can print it or save it as a PDF now. Email delivery can be completed later.');
+    setFeedback({ type: 'success', message: 'Report approved. You can print it or save it as a PDF now. Email delivery can be completed later.' });
   }
 
   async function sendReport() {
     if (!inspection || !validateReport()) return;
     if (!inspection.report_approved && inspection.status !== 'approved' && inspection.status !== 'sent') {
-      alert('Approve the report before sending it by email.');
+      setFeedback({ type: 'error', message: 'Approve the report before sending it by email.' });
       return;
     }
     setSaving(true);
 
     const { data: fnData, error } = await supabase.functions.invoke('send-inspection-report', { body: { inspectionId: inspection.id } });
     if (error || fnData?.success === false || fnData?.emailSent === false) {
-      alert('Report approved but email delivery failed. Check that FROM_EMAIL is configured in Supabase Edge Function secrets with a verified sender address.');
+      setFeedback({ type: 'error', message: 'Report approved but email delivery failed. Email delivery can be configured when the app goes live.' });
       setSaving(false);
       return;
     }
     if (fnData?.usingTestSender) {
-      alert('Report sent! Note: You are using the Resend test sender (onboarding@resend.dev) which only delivers to your Resend account email. To send to customers, add FROM_EMAIL to your Supabase Edge Function secrets using a verified domain address.');
+      setFeedback({ type: 'success', message: 'Report sent using the temporary test sender.' });
     }
 
     await supabase.from('inspections').update({
@@ -375,6 +378,9 @@ export function ReviewInspectionPage() {
 
       {/* Bottom action */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-50">
+        {feedback && <p role="status" className={`text-xs text-center mb-2 font-medium ${feedback.type === 'success' ? 'text-success-700' : 'text-danger-700'}`}>
+          {feedback.message}
+        </p>}
         {!reportReady && <p className="text-xs text-center text-warning-700 mb-2 font-medium">
           {!overall ? 'Select an overall assessment' : !executiveSummary.trim() ? 'Add the Executive Summary' : needsAttention.length > 0 && !primaryRecommendation.trim() ? 'Add the Recommended Next Step' : 'Set a priority for every item requiring attention'}
         </p>}
