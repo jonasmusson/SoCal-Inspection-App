@@ -8,7 +8,7 @@ import { VEHICLE_COLORS } from '../data/vehicleColors';
 import { CameraView, VideoRecorderView, SectionHelp } from '../components/common/CameraComponents';
 import {
   ArrowLeft, Camera, Video, X, Check, ChevronRight, User, Car,
-  FileText, Users, AlertCircle, Palette, CheckCircle, ClipboardList, AlertTriangle,
+  FileText, Users, AlertCircle, Palette, CheckCircle, ClipboardList,
 } from 'lucide-react';
 import { withTimeout } from '../lib/async';
 
@@ -42,10 +42,10 @@ export function CheckInPage() {
   const [requiredPhotos, setRequiredPhotos] = useState(3);
   const [checkinConfig, setCheckinConfig] = useState<CheckinConfig>(DEFAULT_CONFIG);
   const [initLoading, setInitLoading] = useState(true);
-  const [initError, setInitError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<SuccessData | null>(null);
+  const [initError, setInitError] = useState(false);
 
   const [form, setForm] = useState({
     template_id: '',
@@ -77,17 +77,17 @@ export function CheckInPage() {
     setInitLoading(true);
     setInitError(false);
     try {
-      const [{ data: tmplData }, { data: staffData }, { data: settingsData }] = await withTimeout(Promise.all([
-        supabase.from('inspection_templates').select('*').eq('is_active', true).order('sort_order'),
-        supabase.from('user_profiles').select('*').eq('status', 'active').order('full_name'),
-        supabase.from('shop_settings').select('key, value'),
-      ]));
-      if (tmplData?.length) { setTemplates(tmplData); setForm(f => ({ ...f, template_id: tmplData[0].id })); }
-      if (staffData) setStaff(staffData as UserProfile[]);
-      if (settingsData) {
-        const get = (k: string) => settingsData.find((setting: { key: string; value: string }) => setting.key === k)?.value;
-        if (get('checkin_required_photos')) setRequiredPhotos(parseInt(get('checkin_required_photos')!));
-      }
+    const [{ data: tmplData }, { data: staffData }, { data: settingsData }] = await withTimeout(Promise.all([
+      supabase.from('inspection_templates').select('*').eq('is_active', true).order('sort_order'),
+      supabase.from('user_profiles').select('*').eq('status', 'active').order('full_name'),
+      supabase.from('shop_settings').select('key, value'),
+    ]));
+    if (tmplData?.length) { setTemplates(tmplData); setForm(f => ({ ...f, template_id: tmplData[0].id })); }
+    if (staffData) setStaff(staffData as UserProfile[]);
+    if (settingsData) {
+      const get = (k: string) => settingsData.find((setting: { key: string; value: string }) => setting.key === k)?.value;
+      if (get('checkin_required_photos')) setRequiredPhotos(parseInt(get('checkin_required_photos')!));
+    }
     } catch {
       setInitError(true);
     } finally {
@@ -293,16 +293,7 @@ export function CheckInPage() {
   const modelOptions = getModelsForMakeYear(form.vehicle_make, form.vehicle_year);
 
   if (initLoading) return <div className="p-4 text-center text-gray-500">Loading...</div>;
-  if (initError) return (
-    <div className="p-4 text-center py-12">
-      <AlertTriangle className="w-12 h-12 text-danger-300 mx-auto mb-3" />
-      <p className="text-gray-600 mb-4">Unable to load the check-in form. Check your connection and try again.</p>
-      <button onClick={() => loadInit()}
-        className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl">
-        Try Again
-      </button>
-    </div>
-  );
+  if (initError) return <div className="p-6 text-center"><p className="text-gray-600 mb-3">Check-in setup could not be loaded.</p><button onClick={loadInit} className="px-4 py-2 rounded-xl bg-primary-600 text-white font-medium">Try Again</button></div>;
 
   if (success) {
     return (
@@ -364,11 +355,11 @@ export function CheckInPage() {
   }
 
   return (
-    <div className="pb-[200px]">
+    <div className="pb-36">
       {/* Header */}
       <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
         <div className="flex items-center gap-3">
-          <button onClick={() => step === 1 ? navigate('/dashboard') : setStep(1)} className="text-gray-500" aria-label={step === 1 ? 'Back to dashboard' : 'Back to vehicle details'}>
+          <button aria-label={step === 1 ? 'Back to dashboard' : 'Back to vehicle details'} onClick={() => step === 1 ? navigate('/dashboard') : setStep(1)} className="text-gray-500">
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div className="flex-1">
@@ -571,9 +562,8 @@ export function CheckInPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="relative">
-                <input type="number" placeholder="Mileage" value={form.vehicle_mileage || ''}
+                <input type="number" aria-label="Vehicle mileage" placeholder="Mileage" value={form.vehicle_mileage || ''}
                   onChange={e => setForm({ ...form, vehicle_mileage: parseInt(e.target.value) || 0 })}
-                  aria-label="Vehicle mileage"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm" required min={0} />
                 <RequiredDot filled={form.vehicle_mileage > 0} />
               </div>
@@ -772,9 +762,9 @@ export function CheckInPage() {
         </div>
       )}
 
-      {/* Bottom action bar — sits above the 72px Layout nav */}
+      {/* Keep workflow actions above, rather than on top of, the app navigation. */}
       {step === 2 && (
-        <div className="fixed bottom-[72px] left-0 right-0 z-30">
+        <div className="fixed bottom-0 left-0 right-0 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
           {/* Summary strip */}
           <div className="bg-gray-50 border-t border-gray-200 px-4 py-2 flex items-center gap-3 text-xs text-gray-500">
             <span className={`flex items-center gap-1 font-medium ${photosOk ? 'text-success-600' : 'text-warning-600'}`}>
