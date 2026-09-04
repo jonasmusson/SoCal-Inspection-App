@@ -59,6 +59,8 @@ export function CheckInPage() {
   const [localPhotos, setLocalPhotos] = useState<LocalPhoto[]>([]);
   const [localVideo, setLocalVideo] = useState<File | null>(null);
   const [assignedTechId, setAssignedTechId] = useState('');
+  const [customMake, setCustomMake] = useState(false);
+  const [customModel, setCustomModel] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showVideoRecorder, setShowVideoRecorder] = useState(false);
 
@@ -455,26 +457,81 @@ export function CheckInPage() {
               <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Vehicle</h3>
             </div>
             <SectionHelp text="Enter the vehicle details. Make, model, and mileage are required." />
-            <div className="grid grid-cols-3 gap-3 mt-3 mb-3">
-              <select value={form.vehicle_year} onChange={e => {
-                const yr = parseInt(e.target.value);
-                setForm(f => ({ ...f, vehicle_year: yr, vehicle_make: '', vehicle_model: '' }));
-              }} className="px-3 py-3 border border-gray-300 rounded-xl text-sm">
-                {years.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <div className="relative">
-                <input list="makes-list" placeholder="Make" value={form.vehicle_make}
-                  onChange={e => setForm(f => ({ ...f, vehicle_make: e.target.value, vehicle_model: '' }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm" required />
-                <datalist id="makes-list">{makeOptions.map(m => <option key={m} value={m} />)}</datalist>
-                <RequiredDot filled={!!form.vehicle_make.trim()} />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 mb-3">
+              <label className="block">
+                <span className="block text-xs font-semibold text-gray-500 mb-1">Year</span>
+                <select aria-label="Vehicle year" value={form.vehicle_year} onChange={e => {
+                  const yr = parseInt(e.target.value);
+                  setCustomMake(false);
+                  setCustomModel(false);
+                  setForm(f => ({ ...f, vehicle_year: yr, vehicle_make: '', vehicle_model: '' }));
+                }} className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm">
+                  {years.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </label>
+
+              <div>
+                <label htmlFor="vehicle-make" className="block text-xs font-semibold text-gray-500 mb-1">Make</label>
+                <div className="relative">
+                  <select id="vehicle-make" aria-label="Vehicle make"
+                    value={customMake ? '__custom__' : form.vehicle_make}
+                    onChange={e => {
+                      if (e.target.value === '__custom__') {
+                        setCustomMake(true);
+                        setCustomModel(true);
+                        setForm(f => ({ ...f, vehicle_make: '', vehicle_model: '' }));
+                      } else {
+                        setCustomMake(false);
+                        setCustomModel(false);
+                        setForm(f => ({ ...f, vehicle_make: e.target.value, vehicle_model: '' }));
+                      }
+                    }}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm" required={!customMake}>
+                    <option value="">Select make...</option>
+                    {makeOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                    <option value="__custom__">Other / Custom...</option>
+                  </select>
+                  {!customMake && <RequiredDot filled={!!form.vehicle_make.trim()} />}
+                </div>
+                {customMake && (
+                  <div className="relative mt-2">
+                    <input aria-label="Custom vehicle make" placeholder="Enter make" value={form.vehicle_make}
+                      onChange={e => setForm(f => ({ ...f, vehicle_make: e.target.value, vehicle_model: '' }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm" required autoFocus />
+                    <RequiredDot filled={!!form.vehicle_make.trim()} />
+                  </div>
+                )}
               </div>
-              <div className="relative">
-                <input list="models-list" placeholder="Model" value={form.vehicle_model}
-                  onChange={e => setForm(f => ({ ...f, vehicle_model: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm" required />
-                <datalist id="models-list">{modelOptions.map(m => <option key={m} value={m} />)}</datalist>
-                <RequiredDot filled={!!form.vehicle_model.trim()} />
+
+              <div>
+                <label htmlFor="vehicle-model" className="block text-xs font-semibold text-gray-500 mb-1">Model</label>
+                {customModel || (!!form.vehicle_make && modelOptions.length === 0) ? (
+                  <div className="relative">
+                    <input id="vehicle-model" aria-label="Custom vehicle model" placeholder="Enter model" value={form.vehicle_model}
+                      onChange={e => setForm(f => ({ ...f, vehicle_model: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm" required />
+                    <RequiredDot filled={!!form.vehicle_model.trim()} />
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <select id="vehicle-model" aria-label="Vehicle model" value={form.vehicle_model}
+                      onChange={e => {
+                        if (e.target.value === '__custom__') {
+                          setCustomModel(true);
+                          setForm(f => ({ ...f, vehicle_model: '' }));
+                        } else {
+                          setForm(f => ({ ...f, vehicle_model: e.target.value }));
+                        }
+                      }}
+                      disabled={!form.vehicle_make}
+                      className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm disabled:bg-gray-100 disabled:text-gray-400" required>
+                      <option value="">{form.vehicle_make ? 'Select model...' : 'Select make first'}</option>
+                      {modelOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                      {form.vehicle_make && <option value="__custom__">Other / Custom...</option>}
+                    </select>
+                    <RequiredDot filled={!!form.vehicle_model.trim()} />
+                  </div>
+                )}
               </div>
             </div>
 
