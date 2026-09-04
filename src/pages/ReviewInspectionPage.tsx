@@ -213,11 +213,11 @@ export function ReviewInspectionPage() {
   const colorMeta = VEHICLE_COLORS.find(c => c.name === inspection.vehicle_color);
 
   return (
-    <div className="pb-24">
+    <div className="pb-[160px]">
       {/* Header */}
       <div className="sticky top-0 bg-white border-b border-gray-200 z-10 px-4 py-3">
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => navigate(`/inspection/${id}`)} className="text-gray-600">
+          <button onClick={() => navigate(`/inspection/${id}`)} className="text-gray-600" aria-label="Back to inspection">
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div className="flex-1 min-w-0">
@@ -402,8 +402,8 @@ export function ReviewInspectionPage() {
         </div>
       )}
 
-      {/* Bottom action */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-50">
+      {/* Bottom action — sits above the 72px Layout nav */}
+      <div className="fixed bottom-[72px] left-0 right-0 bg-white border-t border-gray-200 p-4 z-30">
         {feedback && <p role="status" className={`text-xs text-center mb-2 font-medium ${feedback.type === 'success' ? 'text-success-700' : 'text-danger-700'}`}>
           {feedback.message}
         </p>}

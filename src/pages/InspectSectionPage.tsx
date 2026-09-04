@@ -233,10 +233,12 @@ export function InspectSectionPage() {
   const currentReady = !!currentItem?.status && (currentItem.status !== 'not_inspected' || !!currentItem.not_inspected_reason?.trim());
 
   return (
-    <div className="pb-32">
+    <div className="pb-[160px]">
       <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
         <div className="flex items-center gap-3 mb-2">
-          <button onClick={() => navigate(`/inspection/${id}`)} className="text-gray-600"><ArrowLeft className="w-6 h-6" /></button>
+          <button onClick={() => navigate(`/inspection/${id}`)} className="text-gray-600" aria-label="Back to inspection">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-gray-500">Section {sectionNum} of {totalSections}</p>
             <h1 className="font-semibold text-gray-900 truncate">{section.section_name}</h1>
@@ -363,8 +365,8 @@ export function InspectSectionPage() {
         })}
       </div>
 
-      {/* Bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-50">
+      {/* Bottom bar — sits above the 72px Layout nav */}
+      <div className="fixed bottom-[72px] left-0 right-0 bg-white border-t border-gray-200 p-4 z-30">
         {missingRequired.length > 0 && allRated && (
           <div className="flex items-start gap-2 mb-3 p-2 bg-warning-50 rounded-lg border border-warning-200">
             <AlertCircle className="w-4 h-4 text-warning-600 flex-shrink-0 mt-0.5" />

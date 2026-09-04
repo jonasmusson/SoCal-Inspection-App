@@ -355,11 +355,11 @@ export function CheckInPage() {
   }
 
   return (
-    <div className="pb-40">
+    <div className="pb-[200px]">
       {/* Header */}
       <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
         <div className="flex items-center gap-3">
-          <button onClick={() => step === 1 ? navigate('/dashboard') : setStep(1)} className="text-gray-500">
+          <button onClick={() => step === 1 ? navigate('/dashboard') : setStep(1)} className="text-gray-500" aria-label={step === 1 ? 'Back to dashboard' : 'Back to vehicle details'}>
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div className="flex-1">
@@ -509,6 +509,7 @@ export function CheckInPage() {
               <div className="relative">
                 <input type="number" placeholder="Mileage" value={form.vehicle_mileage || ''}
                   onChange={e => setForm({ ...form, vehicle_mileage: parseInt(e.target.value) || 0 })}
+                  aria-label="Vehicle mileage"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm" required min={0} />
                 <RequiredDot filled={form.vehicle_mileage > 0} />
               </div>
@@ -707,9 +708,9 @@ export function CheckInPage() {
         </div>
       )}
 
-      {/* Bottom action bar — z-50 to float above the Layout nav bar (z-40) */}
+      {/* Bottom action bar — sits above the 72px Layout nav */}
       {step === 2 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50">
+        <div className="fixed bottom-[72px] left-0 right-0 z-30">
           {/* Summary strip */}
           <div className="bg-gray-50 border-t border-gray-200 px-4 py-2 flex items-center gap-3 text-xs text-gray-500">
             <span className={`flex items-center gap-1 font-medium ${photosOk ? 'text-success-600' : 'text-warning-600'}`}>

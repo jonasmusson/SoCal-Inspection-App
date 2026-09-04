@@ -194,7 +194,7 @@ export function TemplateEditorPage() {
       {/* Header */}
       <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/templates')} className="text-gray-500 hover:text-gray-800">
+          <button onClick={() => navigate('/templates')} className="text-gray-500 hover:text-gray-800" aria-label="Back to templates">
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div className="flex-1">

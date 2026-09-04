@@ -220,7 +220,7 @@ export function InspectionDetailPage() {
             )}
           </div>
         </div>
-        <ProgressBar percent={inspection.progress_percent} />
+        <ProgressBar percent={['pending_review', 'approved', 'sent'].includes(inspection.status) ? 100 : inspection.progress_percent} />
 
         {isActive && canStart && (
           <button onClick={async () => {

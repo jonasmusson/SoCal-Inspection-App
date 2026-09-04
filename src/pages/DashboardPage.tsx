@@ -152,7 +152,7 @@ export function DashboardPage() {
                   <span>{format(new Date(i.created_at), 'MMM d')}</span>
                   <span className="flex items-center gap-1"><Car className="w-4 h-4" /> {i.vehicle_mileage.toLocaleString()} mi</span>
                 </div>
-                {!showArchived && <ProgressBar percent={i.progress_percent} />}
+                {!showArchived && <ProgressBar percent={['pending_review', 'approved', 'sent'].includes(i.status) ? 100 : i.progress_percent} />}
               </button>
             ))}
           </div>

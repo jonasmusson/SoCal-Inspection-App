@@ -142,6 +142,7 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
                   className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="Enter password" required />
                 <button type="button" onClick={() => setShowPass(p => !p)}
+                  aria-label={showPass ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -275,6 +276,7 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
                   className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="Create a secure password" required minLength={12} />
                 <button type="button" onClick={() => setShowPass(p => !p)}
+                  aria-label={showPass ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -295,6 +297,7 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
                   className={`w-full pl-10 pr-10 py-3 border rounded-xl focus:ring-2 focus:ring-primary-500 outline-none ${!passwordsMatch ? 'border-danger-400 bg-danger-50' : 'border-gray-300'}`}
                   placeholder="Re-enter password" required />
                 <button type="button" onClick={() => setShowConfirm(p => !p)}
+                  aria-label={showConfirm ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
