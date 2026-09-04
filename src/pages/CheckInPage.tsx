@@ -213,23 +213,24 @@ export function CheckInPage() {
     const photoResults = await Promise.all(localPhotos.map(async (p, idx) => {
       const fileName = `${inspection.id}/${Date.now()}_${idx}.jpg`;
       const { error: upErr } = await supabase.storage.from('checkin-photos').upload(fileName, p.file, { contentType: 'image/jpeg' });
-      if (upErr) return false;
+      if (upErr) return upErr.message || 'Storage upload failed';
       const { data: { publicUrl } } = supabase.storage.from('checkin-photos').getPublicUrl(fileName);
       const { error: recordError } = await supabase.from('checkin_photos').insert({ inspection_id: inspection.id, photo_url: publicUrl });
-      return !recordError;
+      return recordError ? (recordError.message || 'Photo record could not be created') : null;
     }));
-    if (photoResults.some(result => !result)) warnings.push('One or more check-in photos could not be saved.');
+    const photoErrors = [...new Set(photoResults.filter((result): result is string => !!result))];
+    if (photoErrors.length) warnings.push(`Check-in photo save failed: ${photoErrors.join('; ')}`);
 
     if (localVideo) {
       const ext = localVideo.name.split('.').pop() || 'webm';
       const fileName = `${inspection.id}/${Date.now()}.${ext}`;
       const { error: videoUploadError } = await supabase.storage.from('checkin-videos').upload(fileName, localVideo, { contentType: localVideo.type });
       if (videoUploadError) {
-        warnings.push('The walk-around video could not be saved.');
+        warnings.push(`Walk-around video save failed: ${videoUploadError.message || 'Storage upload failed'}`);
       } else {
         const { data: { publicUrl } } = supabase.storage.from('checkin-videos').getPublicUrl(fileName);
         const { error: videoRecordError } = await supabase.from('inspections').update({ checkin_video_url: publicUrl }).eq('id', inspection.id);
-        if (videoRecordError) warnings.push('The walk-around video could not be linked to the inspection.');
+        if (videoRecordError) warnings.push(`Walk-around video link failed: ${videoRecordError.message || 'Inspection update failed'}`);
       }
     }
 
