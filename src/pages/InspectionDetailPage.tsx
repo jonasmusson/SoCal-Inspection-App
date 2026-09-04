@@ -192,7 +192,7 @@ export function InspectionDetailPage() {
             <StatusBadge status={inspection.status} />
             {(canDelete || canArchive) && (
               <div className="relative">
-                <button onClick={() => setShowMenu(v => !v)}
+                <button aria-label="Inspection actions" onClick={() => setShowMenu(v => !v)}
                   className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">
                   <MoreVertical className="w-5 h-5" />
                 </button>
@@ -245,7 +245,7 @@ export function InspectionDetailPage() {
         {inspection.status === 'approved' && (isManager || isOwner) && (
           <button onClick={() => navigate(`/review/${inspection.id}`)}
             className="w-full mt-4 bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2">
-            Review &amp; Send Report
+            Review Report
           </button>
         )}
         {inspection.status === 'sent' && (isManager || isOwner) && (
