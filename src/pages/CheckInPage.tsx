@@ -66,6 +66,12 @@ export function CheckInPage() {
 
   useEffect(() => { loadInit(); }, []);
   useEffect(() => { if (form.template_id) loadCheckinConfig(form.template_id); }, [form.template_id]);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [step]);
 
   async function loadInit() {
     setInitLoading(true);
