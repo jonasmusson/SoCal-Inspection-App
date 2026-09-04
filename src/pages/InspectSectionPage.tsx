@@ -7,6 +7,7 @@ import { ProgressBar } from '../components/common/ProgressBar';
 import { CameraView, VideoRecorderView } from '../components/common/CameraComponents';
 import { laborSeconds, formatLaborTime } from '../lib/laborTime';
 import { Camera, Video, X, Check, ArrowLeft, ArrowRight, AlertCircle, Pause, Play, Timer } from 'lucide-react';
+import { withTimeout } from '../lib/async';
 
 export function InspectSectionPage() {
   const { id, sectionNumber } = useParams<{ id: string; sectionNumber: string }>();
@@ -19,6 +20,7 @@ export function InspectSectionPage() {
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [totalSections, setTotalSections] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
   const [videoCounts, setVideoCounts] = useState<Record<string, number>>({});
@@ -48,8 +50,10 @@ export function InspectSectionPage() {
   async function loadInspection() {
     if (!id) return;
     setLoading(true);
-    const { data: insp } = await supabase.from('inspections').select('*').eq('id', id).single();
-    const { count } = await supabase.from('inspection_sections').select('*', { count: 'exact', head: true }).eq('inspection_id', id);
+    setLoadError(false);
+    try {
+    const { data: insp } = await withTimeout(supabase.from('inspections').select('*').eq('id', id).single());
+    const { count } = await withTimeout(supabase.from('inspection_sections').select('*', { count: 'exact', head: true }).eq('inspection_id', id));
     setTotalSections(count ?? 0);
     if (insp) {
       setInspection(insp);
@@ -58,11 +62,11 @@ export function InspectSectionPage() {
       }
     }
 
-    const { data: sec } = await supabase.from('inspection_sections').select('*').eq('inspection_id', id).eq('section_number', sectionNum).single();
+    const { data: sec } = await withTimeout(supabase.from('inspection_sections').select('*').eq('inspection_id', id).eq('section_number', sectionNum).single());
     setSection(sec || null);
 
     if (sec) {
-      const { data: itemsData } = await supabase.from('inspection_items').select('*').eq('section_id', sec.id).order('created_at');
+      const { data: itemsData } = await withTimeout(supabase.from('inspection_items').select('*').eq('section_id', sec.id).order('created_at'));
       const loadedItems = itemsData || [];
       setItems(loadedItems);
       const firstOpen = loadedItems.findIndex(item => !item.status);
@@ -74,10 +78,10 @@ export function InspectSectionPage() {
 
       if (loadedItems.length > 0) {
         const itemIds = loadedItems.map(i => i.id);
-        const [{ data: photos }, { data: videos }] = await Promise.all([
+        const [{ data: photos }, { data: videos }] = await withTimeout(Promise.all([
           supabase.from('inspection_photos').select('item_id').in('item_id', itemIds),
           supabase.from('inspection_videos').select('item_id').in('item_id', itemIds),
-        ]);
+        ]));
         const pc: Record<string, number> = {};
         const vc: Record<string, number> = {};
         photos?.forEach(p => { pc[p.item_id] = (pc[p.item_id] || 0) + 1; });
@@ -86,7 +90,11 @@ export function InspectSectionPage() {
         setVideoCounts(vc);
       }
     }
-    setLoading(false);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function saveAndExit() {
@@ -220,6 +228,7 @@ export function InspectSectionPage() {
   }
 
   if (loading) return <div className="p-4 text-center text-gray-500">Loading...</div>;
+  if (loadError) return <div className="p-6 text-center"><p className="text-gray-600 mb-3">This inspection section could not be loaded.</p><button onClick={loadInspection} className="px-4 py-2 rounded-xl bg-primary-600 text-white font-medium">Try Again</button></div>;
   if (!section || !inspection) return <div className="p-4 text-center text-gray-500">Not found</div>;
 
   const allRated = items.every(i => i.status);
@@ -233,12 +242,10 @@ export function InspectSectionPage() {
   const currentReady = !!currentItem?.status && (currentItem.status !== 'not_inspected' || !!currentItem.not_inspected_reason?.trim());
 
   return (
-    <div className="pb-[160px]">
+    <div className="pb-28">
       <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
         <div className="flex items-center gap-3 mb-2">
-          <button onClick={() => navigate(`/inspection/${id}`)} className="text-gray-600" aria-label="Back to inspection">
-            <ArrowLeft className="w-6 h-6" />
-          </button>
+          <button aria-label="Back to inspection" onClick={() => navigate(`/inspection/${id}`)} className="text-gray-600"><ArrowLeft className="w-6 h-6" /></button>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-gray-500">Section {sectionNum} of {totalSections}</p>
             <h1 className="font-semibold text-gray-900 truncate">{section.section_name}</h1>
@@ -365,8 +372,8 @@ export function InspectSectionPage() {
         })}
       </div>
 
-      {/* Bottom bar — sits above the 72px Layout nav */}
-      <div className="fixed bottom-[72px] left-0 right-0 bg-white border-t border-gray-200 p-4 z-30">
+      {/* Bottom bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
         {missingRequired.length > 0 && allRated && (
           <div className="flex items-start gap-2 mb-3 p-2 bg-warning-50 rounded-lg border border-warning-200">
             <AlertCircle className="w-4 h-4 text-warning-600 flex-shrink-0 mt-0.5" />
