@@ -805,7 +805,7 @@ export function CheckInPage() {
 
       {/* Camera overlay */}
       {showCamera && (
-        <div className="fixed inset-0 bg-black z-50 flex flex-col">
+        <div className="fixed inset-x-0 top-0 h-[100dvh] bg-black z-50 flex flex-col">
           <div className="flex justify-between items-center p-4 text-white">
             <button onClick={() => setShowCamera(false)}><X className="w-6 h-6" /></button>
             <span className="font-medium">
