@@ -82,6 +82,19 @@ function PendingApprovalScreen() {
   );
 }
 
+function ManagerRoute({ children }: { children: React.ReactNode }) {
+  const { isManager, isOwner } = useAuth();
+  if (!isManager && !isOwner) return <Navigate to="/my-inspections" replace />;
+  return <>{children}</>;
+}
+
+function OwnerRoute({ children }: { children: React.ReactNode }) {
+  const { isOwner, profile } = useAuth();
+  const defaultRoute = profile?.role === 'tech' ? '/my-inspections' : '/dashboard';
+  if (!isOwner) return <Navigate to={defaultRoute} replace />;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   const { user, profile, loading, profileError, isPending, isPasswordRecovery, clearPasswordRecovery } = useAuth();
   const [showSignup, setShowSignup] = useState(false);
@@ -112,16 +125,16 @@ function AppRoutes() {
     <Layout>
       <Routes>
         <Route path="/" element={<Navigate to={defaultRoute} replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/dashboard" element={<ManagerRoute><DashboardPage /></ManagerRoute>} />
         <Route path="/my-inspections" element={<MyInspectionsPage />} />
-        <Route path="/checkin" element={<CheckInPage />} />
+        <Route path="/checkin" element={<ManagerRoute><CheckInPage /></ManagerRoute>} />
         <Route path="/inspection/:id" element={<InspectionDetailPage />} />
         <Route path="/inspect/:id" element={<InspectRedirect />} />
         <Route path="/inspect/:id/:sectionNumber" element={<InspectSectionPage />} />
-        <Route path="/review/:id" element={<ReviewInspectionPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/templates" element={<TemplatesPage />} />
-        <Route path="/templates/:id" element={<TemplateEditorPage />} />
+        <Route path="/review/:id" element={<ManagerRoute><ReviewInspectionPage /></ManagerRoute>} />
+        <Route path="/settings" element={<ManagerRoute><SettingsPage /></ManagerRoute>} />
+        <Route path="/templates" element={<OwnerRoute><TemplatesPage /></OwnerRoute>} />
+        <Route path="/templates/:id" element={<OwnerRoute><TemplateEditorPage /></OwnerRoute>} />
         <Route path="*" element={<Navigate to={defaultRoute} replace />} />
       </Routes>
     </Layout>
