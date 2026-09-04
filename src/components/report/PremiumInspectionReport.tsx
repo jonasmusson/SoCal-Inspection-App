@@ -127,16 +127,20 @@ export function PremiumInspectionReport({
           {heroPhoto && <img src={heroPhoto} alt={vehicleName} className="absolute inset-0 h-full w-full object-cover opacity-45" />}
           <div className="absolute inset-0 bg-gradient-to-b from-[#11150f]/55 via-[#20251f]/55 to-[#171b16]" />
           <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#171b16] via-[#171b16]/85 to-transparent" />
+          <div className={`pointer-events-none absolute left-1/2 top-20 h-48 w-[82%] max-w-2xl -translate-x-1/2 ${heroPhoto ? 'opacity-45' : 'opacity-90'}`}>
+            <ClassicCarLine color={vehicleColor} />
+          </div>
           <div className="relative z-10 flex min-h-[520px] flex-col px-6 py-7 sm:px-10 sm:py-9">
             <div className="flex items-start justify-between gap-4 border-b border-white/20 pb-5">
-              <img src="/image.png" alt="SoCal Autoworks" className="h-9 max-w-[150px] object-contain brightness-0 invert" />
+              <span className="inline-flex rounded-md bg-white px-2.5 py-1.5 shadow-sm">
+                <img src="/image.png" alt="SoCal Autoworks" className="h-8 w-auto object-contain" />
+              </span>
               <div className="text-right">
                 <p className="text-[10px] font-bold uppercase tracking-[.24em] text-[#d3b56d]">Comprehensive Inspection</p>
                 <p className="mt-1 text-xs text-white/60">Report {inspection.id.slice(0, 8).toUpperCase()}</p>
               </div>
             </div>
 
-            {!heroPhoto && <div className="mx-auto mt-7 h-44 w-full max-w-2xl opacity-90"><ClassicCarLine color={vehicleColor} /></div>}
             <div className="mt-auto max-w-3xl">
               <div className="mb-4 flex items-center gap-2 text-[#d3b56d]">
                 <Sparkles className="h-4 w-4" />
@@ -274,7 +278,9 @@ export function PremiumInspectionReport({
         </div>
 
         <footer data-report-card className="bg-[#20251f] px-6 py-10 text-center text-white sm:px-10">
-          <img src="/image.png" alt="SoCal Autoworks" className="mx-auto h-9 max-w-[160px] object-contain brightness-0 invert" />
+          <span className="mx-auto inline-flex rounded-md bg-white px-3 py-2 shadow-sm">
+            <img src="/image.png" alt="SoCal Autoworks" className="h-9 w-auto object-contain" />
+          </span>
           <p className="mx-auto mt-5 max-w-xl text-xl font-black">Know what you have. Understand what it needs. Build the right plan.</p>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-white/60">Questions about your report? We are happy to walk through every finding and help prioritize the next steps around your goals, budget and timeline.</p>
           <div className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#d3b56d]"><span>socalautowork.com</span><span>Hawthorne, California</span><span>Comprehensive Inspection</span></div>
