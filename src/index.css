@@ -99,4 +99,15 @@ input[type=number] {
     break-inside: avoid;
     page-break-inside: avoid;
   }
+
+  .printable-report [data-report-cover] {
+    min-height: 10in !important;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .printable-report img {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
