@@ -56,11 +56,13 @@ export function CameraView({ onCapture }: { onCapture: (file: File) => void }) {
           </>
         )}
       </div>
-      <div className="flex justify-center items-center px-6 pt-5 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:py-6 bg-black">
+      <div className="h-28 bg-black sm:h-28" aria-hidden="true" />
+      <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+9rem)] z-[60] flex justify-center pointer-events-none sm:bottom-8">
         <button
           onClick={capture}
           disabled={!videoReady}
-          className={`w-16 h-16 rounded-full bg-white flex items-center justify-center ring-4 ring-white/30 transition-opacity ${videoReady ? 'opacity-100' : 'opacity-30'}`}
+          aria-label="Take photo"
+          className={`pointer-events-auto w-16 h-16 rounded-full bg-white flex items-center justify-center ring-4 ring-white/30 shadow-2xl transition-opacity ${videoReady ? 'opacity-100' : 'opacity-30'}`}
         >
           <div className="w-12 h-12 rounded-full bg-white border-4 border-gray-900" />
         </button>
