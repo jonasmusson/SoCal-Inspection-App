@@ -56,7 +56,7 @@ export function CameraView({ onCapture }: { onCapture: (file: File) => void }) {
           </>
         )}
       </div>
-      <div className="flex justify-center items-center p-6 bg-black">
+      <div className="flex justify-center items-center px-6 pt-5 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:py-6 bg-black">
         <button
           onClick={capture}
           disabled={!videoReady}
@@ -175,7 +175,7 @@ export function VideoRecorderView({ onCapture, onClose, title = 'Record Video' }
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
+    <div className="fixed inset-x-0 top-0 h-[100dvh] bg-black z-50 flex flex-col">
       <div className="flex justify-between items-center p-4 text-white">
         <button onClick={onClose}><X className="w-6 h-6" /></button>
         <span className="font-medium">
@@ -189,7 +189,7 @@ export function VideoRecorderView({ onCapture, onClose, title = 'Record Video' }
           <div className="flex-1 bg-black flex items-center justify-center">
             <video src={previewUrl} controls className="w-full h-full object-contain" />
           </div>
-          <div className="flex gap-3 p-5 bg-black">
+          <div className="flex gap-3 px-5 pt-5 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:p-5 bg-black">
             <button
               onClick={reRecord}
               className="flex-1 py-3.5 rounded-xl border border-white/30 text-white font-medium flex items-center justify-center gap-2"
@@ -246,7 +246,7 @@ export function VideoRecorderView({ onCapture, onClose, title = 'Record Video' }
               </>
             )}
           </div>
-          <div className="flex flex-col items-center gap-2 p-6 bg-black">
+          <div className="flex flex-col items-center gap-2 px-6 pt-5 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:p-6 bg-black">
             {!recording ? (
               <>
                 <button
