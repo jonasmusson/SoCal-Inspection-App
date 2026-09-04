@@ -43,24 +43,71 @@ function money(value: number) {
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 }
 
-function ClassicCarLine({ color }: { color: string }) {
+type ReportSystemStatus = 'attention' | 'monitor' | 'good' | 'not_inspected';
+
+const SYSTEM_ACCENT: Record<ReportSystemStatus, string> = {
+  attention: '#dc5a4b',
+  monitor: '#d6a63c',
+  good: '#4f8a67',
+  not_inspected: '#8a8b84',
+};
+
+function CutawayVehicleDiagram({ color }: { color: string }) {
   return (
-    <svg viewBox="0 0 720 230" role="img" aria-label="Classic vehicle profile" className="h-full w-full">
+    <svg viewBox="0 0 920 420" role="img" aria-label="Classic vehicle technical cutaway" className="h-full w-full">
       <defs>
-        <linearGradient id="car-glow" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor={color} stopOpacity=".9" />
-          <stop offset="1" stopColor="#d3b56d" stopOpacity=".55" />
+        <linearGradient id="cutaway-body" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={color} stopOpacity=".42" />
+          <stop offset="1" stopColor="#d7bd7b" stopOpacity=".16" />
         </linearGradient>
+        <filter id="cutaway-glow"><feGaussianBlur stdDeviation="4" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
       </defs>
-      <path d="M74 148c17-35 42-48 87-55l91-12 63-47c14-10 30-15 48-15h95c21 0 39 7 55 22l51 48 74 16c27 6 43 20 50 43l5 20h-52c-7-39-31-61-68-61-36 0-61 22-68 61H247c-7-39-31-61-68-61-36 0-61 22-68 61H58l3-12c3-10 7-19 13-28Z" fill="url(#car-glow)" opacity=".17" />
-      <path d="M62 166h47c6-39 31-64 70-64 40 0 64 25 70 64h256c6-39 31-64 70-64 40 0 64 25 70 64h48M78 145c16-31 39-43 84-50l91-13 62-46c14-10 30-15 48-15h95c20 0 38 7 53 21l52 48 75 16c27 6 42 20 49 39M265 79h270M372 23l-25 56M458 23l45 56M111 166H58M645 166h50" fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="179" cy="170" r="42" fill="#151814" stroke="rgba(255,255,255,.8)" strokeWidth="4" />
-      <circle cx="179" cy="170" r="19" fill="none" stroke="#d3b56d" strokeWidth="5" />
-      <circle cx="575" cy="170" r="42" fill="#151814" stroke="rgba(255,255,255,.8)" strokeWidth="4" />
-      <circle cx="575" cy="170" r="19" fill="none" stroke="#d3b56d" strokeWidth="5" />
-      <path d="M107 129h38M589 118h52M282 94h18" stroke="#d3b56d" strokeWidth="5" strokeLinecap="round" />
+      <g opacity=".14" stroke="#f3ead3" strokeWidth="1"><path d="M38 70h844M38 140h844M38 210h844M38 280h844M38 350h844" /><path d="M120 34v350M240 34v350M360 34v350M480 34v350M600 34v350M720 34v350M840 34v350" /></g>
+      <path d="M111 283c11-65 48-104 112-117l95-19 64-91c10-15 27-24 45-24h216c20 0 38 8 51 23l76 90 63 14c34 8 55 30 61 65l5 29h-84c-8-55-43-87-95-87-51 0-87 32-95 87H304c-8-55-43-87-95-87-52 0-87 32-95 87H75l7-23c5-16 15-29 29-37Z" fill="url(#cutaway-body)" stroke="#efe6cf" strokeWidth="4" strokeLinejoin="round" />
+      <path d="M323 146h430M431 38l-61 108M625 38l78 108M505 38v108M257 155l32 93h404l42-93M116 247h47M756 247h92" fill="none" stroke="#efe6cf" strokeWidth="3" opacity=".78" />
+      <path d="M183 263h561" stroke="#c5aa69" strokeWidth="8" strokeLinecap="round" opacity=".8" />
+      <path d="M275 259l26-51M648 259l-26-51M303 259h318" stroke="#d9c996" strokeWidth="4" strokeLinecap="round" />
+      <circle cx="209" cy="271" r="66" fill="#171b17" stroke="#efe6cf" strokeWidth="5" /><circle cx="209" cy="271" r="39" fill="none" stroke="#c5aa69" strokeWidth="8" /><circle cx="209" cy="271" r="11" fill="#c5aa69" />
+      <circle cx="690" cy="271" r="66" fill="#171b17" stroke="#efe6cf" strokeWidth="5" /><circle cx="690" cy="271" r="39" fill="none" stroke="#c5aa69" strokeWidth="8" /><circle cx="690" cy="271" r="11" fill="#c5aa69" />
+      <g filter="url(#cutaway-glow)">
+        <path d="M296 187h92l28 24-22 49H286l-18-39Z" fill="#b98b45" fillOpacity=".46" stroke="#e8c56d" strokeWidth="3" />
+        <path d="M308 176v-22h55v22M288 218h-25M416 218h29" stroke="#e8c56d" strokeWidth="4" />
+        <rect x="240" y="187" width="18" height="72" rx="7" fill="#6ea6ad" stroke="#9fd0d5" strokeWidth="2" />
+        <path d="M414 236h76l52 28h81" fill="none" stroke="#d3b56d" strokeWidth="8" strokeLinecap="round" />
+        <path d="M480 262l22-19 27 19-27 19Z" fill="#d3b56d" fillOpacity=".5" stroke="#ead38f" strokeWidth="2" />
+        <path d="M307 281c58 29 169 35 263 22 50-7 83-19 104-34" fill="none" stroke="#c58e59" strokeWidth="5" strokeDasharray="8 6" />
+        <path d="M458 95v103M541 95v103M458 112c24-21 59-21 83 0" fill="none" stroke="#79b99a" strokeWidth="3" strokeDasharray="6 5" />
+      </g>
+      <g fontFamily="sans-serif" fontSize="15" fontWeight="700" letterSpacing="1.2" fill="#f7f2e7">
+        <path d="M317 185 242 107H90" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="317" cy="185" r="5" fill="#d3b56d" /><text x="90" y="98">ENGINE + COOLING</text>
+        <path d="M207 226 155 156H57" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="207" cy="226" r="5" fill="#d3b56d" /><text x="57" y="147">BRAKES + SUSPENSION</text>
+        <path d="M502 257 580 107H832" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="502" cy="257" r="5" fill="#d3b56d" /><text x="649" y="98">TRANSMISSION + DRIVELINE</text>
+        <path d="M670 301 756 345H866" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="670" cy="301" r="5" fill="#d3b56d" /><text x="706" y="370">FUEL + EXHAUST</text>
+        <path d="M540 118 614 62H832" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="540" cy="118" r="5" fill="#d3b56d" /><text x="678" y="53">BODY + ELECTRICAL</text>
+      </g>
     </svg>
   );
+}
+
+function SystemIllustration({ name, status }: { name: string; status: ReportSystemStatus }) {
+  const key = name.toLowerCase();
+  const accent = SYSTEM_ACCENT[status];
+  const common = { fill: 'none', stroke: accent, strokeWidth: 4, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  let art: JSX.Element;
+  if (key.includes('brake')) art = <><circle cx="80" cy="60" r="34" {...common} /><circle cx="80" cy="60" r="10" {...common} /><path d="M104 35h18v50h-18M43 60H20" {...common} /></>;
+  else if (key.includes('suspension') || key.includes('steering')) art = <><path d="M20 36h30l12 48h36l12-48h30M45 24l22 72M115 24 93 96" {...common} /><circle cx="38" cy="91" r="14" {...common} /><circle cx="122" cy="91" r="14" {...common} /></>;
+  else if (key.includes('engine')) art = <><path d="M29 43h18l10-16h45l11 16h17v45H29Z" {...common} /><path d="M47 43v45M66 27V15h25v12M75 54h23M75 69h23" {...common} /></>;
+  else if (key.includes('cool')) art = <><rect x="42" y="18" width="76" height="84" rx="8" {...common} /><path d="M55 31v58M68 31v58M81 31v58M94 31v58M107 31v58M27 42h15M118 79h15" {...common} /></>;
+  else if (key.includes('electric')) art = <><path d="M87 13 48 65h29l-7 42 42-58H82Z" {...common} /><circle cx="28" cy="28" r="11" {...common} /><circle cx="132" cy="92" r="11" {...common} /></>;
+  else if (key.includes('fuel')) art = <><path d="M38 25h63v75H38Z" {...common} /><path d="M101 42h15l12 13v41c0 8 12 8 12 0V53l-12-13M53 41h33" {...common} /></>;
+  else if (key.includes('exhaust')) art = <><path d="M18 36h46c10 0 14 8 14 18v18c0 10 5 16 15 16h48" {...common} /><path d="M104 76h25v24h-25Z" {...common} /></>;
+  else if (key.includes('transmission')) art = <><path d="M38 31h45l24 22v36l-24 15H38L21 78V48Z" {...common} /><path d="M107 70h34M52 49v37M70 49v37" {...common} /></>;
+  else if (key.includes('driveline')) art = <><circle cx="30" cy="60" r="18" {...common} /><circle cx="130" cy="60" r="18" {...common} /><path d="M48 60h64M73 44l28 32M101 44 73 76" {...common} /></>;
+  else if (key.includes('wheel') || key.includes('tire')) art = <><circle cx="80" cy="60" r="45" {...common} /><circle cx="80" cy="60" r="18" {...common} /><path d="M80 42v36M62 60h36M67 47l26 26M93 47 67 73" {...common} /></>;
+  else if (key.includes('under')) art = <><path d="M18 42h124M31 42l17 43h65l16-43M58 85v18M102 85v18" {...common} /><path d="M48 65h65" {...common} /></>;
+  else if (key.includes('test') || key.includes('drive')) art = <><circle cx="80" cy="66" r="40" {...common} /><circle cx="80" cy="66" r="9" {...common} /><path d="M80 57V29M74 72 48 90M86 72l26 18M28 19h104" {...common} /></>;
+  else art = <><path d="M17 77c8-30 25-43 56-49l42-8 28 32v35h-17c-4-20-16-30-35-30S60 67 56 87H18Z" {...common} /><circle cx="91" cy="87" r="18" {...common} /><path d="M40 49h69M73 28 60 49" {...common} /></>;
+  return <svg viewBox="0 0 160 120" role="img" aria-label={`${name} system illustration`} className="h-full w-full">{art}</svg>;
 }
 
 export function PremiumInspectionReport({
@@ -94,7 +141,8 @@ export function PremiumInspectionReport({
     const passed = sectionItems.filter(item => item.status === 'good').length;
     const skipped = sectionItems.filter(item => item.status === 'not_inspected').length;
     const status = attention ? 'attention' : watching ? 'monitor' : passed ? 'good' : 'not_inspected';
-    return { section, attention, watching, passed, skipped, total: sectionItems.length, status };
+    const highlightedItems = sectionItems.filter(item => item.status === 'needs_attention' || item.status === 'monitor');
+    return { section, attention, watching, passed, skipped, total: sectionItems.length, status, highlightedItems };
   });
 
   function allowance(item: InspectionItem) {
@@ -128,7 +176,7 @@ export function PremiumInspectionReport({
           <div className="absolute inset-0 bg-gradient-to-b from-[#11150f]/55 via-[#20251f]/55 to-[#171b16]" />
           <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#171b16] via-[#171b16]/85 to-transparent" />
           <div className={`pointer-events-none absolute left-1/2 top-20 h-48 w-[82%] max-w-2xl -translate-x-1/2 ${heroPhoto ? 'opacity-45' : 'opacity-90'}`}>
-            <ClassicCarLine color={vehicleColor} />
+            <CutawayVehicleDiagram color={vehicleColor} />
           </div>
           <div className="relative z-10 flex min-h-[520px] flex-col px-6 py-7 sm:px-10 sm:py-9">
             <div className="flex items-start justify-between gap-4 border-b border-white/20 pb-5">
@@ -202,25 +250,58 @@ export function PremiumInspectionReport({
             </div>
           </section>}
 
-          <section data-report-card>
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div><p className="text-[10px] font-black uppercase tracking-[.24em] text-[#9b7a38]">02 · Vehicle health map</p><h2 className="mt-2 text-2xl font-black text-[#252b24]">Every system, one clear view.</h2></div>
-              <div className="flex gap-3 text-[10px] font-bold uppercase tracking-wide text-stone-500"><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-emerald-500" />Good</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-amber-500" />Monitor</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-red-500" />Attention</span></div>
+          <section data-report-card className="overflow-hidden rounded-[28px] bg-[#1d231e] text-white shadow-xl">
+            <div className="grid gap-5 px-6 pt-7 sm:px-9 lg:grid-cols-[.7fr_1.3fr] lg:items-center">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#d3b56d]">02 · The complete vehicle</p>
+                <h2 className="mt-2 text-3xl font-black tracking-tight">One vehicle.<br />Every system connected.</h2>
+                <p className="mt-4 text-sm leading-7 text-white/65">We inspect the car as a complete mechanical story—not a collection of unrelated checkboxes. Each chapter below follows the same path our technician takes through the vehicle.</p>
+                <div className="mt-5 flex flex-wrap gap-3 text-[9px] font-bold uppercase tracking-wider text-white/65">
+                  <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-emerald-500" />Good</span>
+                  <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-amber-500" />Monitor</span>
+                  <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-red-500" />Attention</span>
+                </div>
+              </div>
+              <div className="min-h-[290px] py-3"><CutawayVehicleDiagram color={vehicleColor} /></div>
             </div>
-            <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {sectionRows.map(({ section, attention, watching, passed, skipped, total, status }) => {
-                const tone = status === 'attention' ? 'border-red-200 bg-red-50' : status === 'monitor' ? 'border-amber-200 bg-amber-50' : status === 'good' ? 'border-emerald-200 bg-emerald-50' : 'border-stone-200 bg-stone-100';
-                const dot = status === 'attention' ? 'bg-red-500' : status === 'monitor' ? 'bg-amber-500' : status === 'good' ? 'bg-emerald-500' : 'bg-stone-400';
-                return <div key={section.id} className={`rounded-xl border p-3.5 ${tone}`}>
-                  <div className="flex items-start gap-3"><span className={`mt-1 h-2.5 w-2.5 flex-none rounded-full ${dot}`} /><div className="min-w-0"><p className="text-sm font-bold text-stone-800">{section.section_name}</p><p className="mt-1 text-[10px] text-stone-500">{total} checked · {passed} good{watching ? ` · ${watching} monitor` : ''}{attention ? ` · ${attention} attention` : ''}{skipped ? ` · ${skipped} skipped` : ''}</p></div></div>
-                </div>;
+            <div className="grid grid-cols-5 border-t border-white/10 bg-black/15 px-5 py-4 text-center text-[8px] font-bold uppercase tracking-widest text-[#d3b56d] sm:text-[9px]">
+              <span>Structure</span><span>Power</span><span>Control</span><span>Safety</span><span>Road</span>
+            </div>
+          </section>
+
+          <section>
+            <div className="max-w-2xl">
+              <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#9b7a38]">03 · System-by-system</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-[#252b24]">Follow the inspection from front to back.</h2>
+              <p className="mt-3 text-sm leading-7 text-stone-600">Every illustrated chapter matches a section completed in the app, so the findings stay easy to understand and easy to discuss.</p>
+            </div>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {sectionRows.map(({ section, attention, watching, passed, skipped, total, status, highlightedItems }, index) => {
+                const accent = SYSTEM_ACCENT[status as ReportSystemStatus];
+                const statusLabel = status === 'attention' ? 'Needs attention' : status === 'monitor' ? 'Monitor' : status === 'good' ? 'All good' : 'Not inspected';
+                return <article data-report-card key={section.id} className="group overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                  <div className="grid min-h-[210px] grid-cols-[.42fr_.58fr]">
+                    <div className="relative flex items-center justify-center overflow-hidden bg-[#222923] p-4">
+                      <div className="absolute left-3 top-3 text-[9px] font-black uppercase tracking-[.18em] text-white/35">{String(index + 1).padStart(2, '0')}</div>
+                      <div className="h-28 w-full opacity-95"><SystemIllustration name={section.section_name} status={status as ReportSystemStatus} /></div>
+                      <span className="absolute bottom-3 left-3 rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-wider" style={{ color: accent, borderColor: `${accent}66`, backgroundColor: `${accent}18` }}>{statusLabel}</span>
+                    </div>
+                    <div className="flex flex-col p-4 sm:p-5">
+                      <p className="text-[9px] font-bold uppercase tracking-[.18em] text-stone-400">Inspection chapter</p>
+                      <h3 className="mt-1 text-lg font-black leading-tight text-[#252b24]">{section.section_name}</h3>
+                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-stone-100"><div className="h-full rounded-full" style={{ width: `${total ? Math.max(8, Math.round(((passed + watching + attention) / total) * 100)) : 0}%`, backgroundColor: accent }} /></div>
+                      <p className="mt-2 text-[10px] leading-5 text-stone-500">{total} checks · {passed} good{watching ? ` · ${watching} monitor` : ''}{attention ? ` · ${attention} attention` : ''}{skipped ? ` · ${skipped} not inspected` : ''}</p>
+                      {highlightedItems.length > 0 ? <div className="mt-auto pt-3"><p className="text-[9px] font-black uppercase tracking-wider" style={{ color: accent }}>Key finding</p><p className="mt-1 text-xs font-semibold leading-5 text-stone-700">{highlightedItems[0].item_name}</p></div> : <div className="mt-auto flex items-center gap-1.5 pt-3 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />No concerns identified</div>}
+                    </div>
+                  </div>
+                </article>;
               })}
             </div>
           </section>
 
           {rangedItems.length > 0 && <section data-report-card className="rounded-2xl bg-[#e8e1ce] p-6 sm:p-8">
             <div className="grid gap-6 sm:grid-cols-3">
-              <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#8a6b30]">03 · Planning snapshot</p><h2 className="mt-2 text-2xl font-black text-[#252b24]">A realistic place to start.</h2></div>
+              <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#8a6b30]">04 · Planning snapshot</p><h2 className="mt-2 text-2xl font-black text-[#252b24]">A realistic place to start.</h2></div>
               <div className="flex items-center gap-3 rounded-xl bg-white/70 p-4"><Clock3 className="h-7 w-7 text-[#8a6b30]" /><div><p className="text-[10px] uppercase tracking-widest text-stone-500">Labor allowance</p><p className="text-xl font-black">{totalLaborLow}–{totalLaborHigh} hours</p></div></div>
               <div className="flex items-center gap-3 rounded-xl bg-white/70 p-4"><Wrench className="h-7 w-7 text-[#8a6b30]" /><div><p className="text-[10px] uppercase tracking-widest text-stone-500">Parts allowance</p><p className="text-xl font-black">{money(totalPartsLow)}–{money(totalPartsHigh)}</p></div></div>
             </div>
@@ -228,7 +309,7 @@ export function PremiumInspectionReport({
           </section>}
 
           {needsAttention.length > 0 && <section>
-            <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#9b7a38]">04 · Findings</p>
+            <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#9b7a38]">05 · Findings</p>
             <h2 className="mt-2 text-2xl font-black text-[#252b24]">What needs attention—and why.</h2>
             <div className="mt-5 space-y-5">
               {needsAttention.map((item, index) => {
@@ -259,7 +340,7 @@ export function PremiumInspectionReport({
           </section>}
 
           {monitor.length > 0 && <section data-report-card>
-            <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#9b7a38]">05 · Watch list</p>
+            <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#9b7a38]">06 · Watch list</p>
             <h2 className="mt-2 text-2xl font-black text-[#252b24]">Not urgent. Not forgotten.</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">{monitor.map(item => {
               const section = sections.find(s => s.id === item.section_id);
