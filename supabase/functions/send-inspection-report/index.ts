@@ -88,8 +88,12 @@ Deno.serve(async (req: Request) => {
     const usd = (value: number) => value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     let photos: {item_id:string;photo_url:string}[] = [];
     if (items.length) { const ids=items.map(i=>i.id).join(","); const res=await fetch(`${supabaseUrl}/rest/v1/inspection_photos?item_id=in.(${ids})&select=item_id,photo_url`,{headers:hdrs}); photos=await res.json(); }
+    const checkinPhotoRes = await fetch(`${supabaseUrl}/rest/v1/checkin_photos?inspection_id=eq.${inspectionId}&select=photo_url&order=created_at`, { headers: hdrs });
+    const checkinPhotos: { photo_url: string }[] = checkinPhotoRes.ok ? await checkinPhotoRes.json() : [];
 
     const cond = CONDITION_CONFIG[insp.overall_condition] ?? CONDITION_CONFIG["good"];
+    const inspectedCount = good.length + monitor.length + needsAttention.length;
+    const conditionIndex = inspectedCount ? Math.round(((good.length + monitor.length * 0.5) / inspectedCount) * 100) : 0;
 
     function sectionName(sectionId: string) {
       return sections.find(s => s.id === sectionId)?.section_name ?? "";
@@ -148,6 +152,7 @@ Deno.serve(async (req: Request) => {
         </div>
       </div>`;
     const notInspectedHtml = notInspected.length===0?"":`<div style="margin-bottom:28px"><h3 style="font-size:13px;text-transform:uppercase;color:#374151">● Not Inspected (${notInspected.length})</h3>${notInspected.map(i=>`<div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:8px;background:#f9fafb"><b>${esc(i.item_name)}</b><p style="font-size:12px;color:#6b7280">${esc(i.not_inspected_reason||"Reason not provided")}</p></div>`).join("")}</div>`;
+    const healthMapHtml = `<div style="margin:0 0 28px"><p style="margin:0 0 5px;color:#9b7a38;font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase">02 · Vehicle Health Map</p><h2 style="margin:0 0 14px;color:#252b24;font-size:22px">Every system, one clear view.</h2><table width="100%" cellspacing="0" cellpadding="0">${sections.map(section=>{const sectionItems=items.filter(item=>item.section_id===section.id);const attention=sectionItems.filter(item=>item.status==="needs_attention").length;const watching=sectionItems.filter(item=>item.status==="monitor").length;const passed=sectionItems.filter(item=>item.status==="good").length;const color=attention?"#ef4444":watching?"#f59e0b":passed?"#22c55e":"#a8a29e";const bg=attention?"#fef2f2":watching?"#fffbeb":passed?"#f0fdf4":"#f5f5f4";return `<tr><td style="padding:4px 0"><div style="border:1px solid #e7e5e4;border-radius:9px;background:${bg};padding:10px 12px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:8px"></span><b style="font-size:12px;color:#292524">${esc(section.section_name)}</b><span style="float:right;font-size:10px;color:#78716c">${passed} good${watching?` · ${watching} monitor`:""}${attention?` · ${attention} attention`:""}</span></div></td></tr>`}).join("")}</table></div>`;
 
     const managerNotesHtml = insp.manager_notes ? `
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px;margin-bottom:28px">
@@ -174,12 +179,15 @@ Deno.serve(async (req: Request) => {
   <div style="max-width:620px;margin:32px auto;background:#f3f4f6;padding:0 16px 32px">
 
     <!-- Header -->
-    <div style="background:#fff;border-radius:16px 16px 0 0;padding:28px 32px 0;text-align:center;border-bottom:none">
-      <img src="https://osvzenblbfkxrjnexhaz.supabase.co/storage/v1/object/public/brand/logo.png" alt="SoCal Autoworks" style="height:56px;object-fit:contain;margin:0 auto 20px;display:block" />
-      <div style="background:linear-gradient(135deg,#20251f,#3d463a);border-radius:12px;padding:28px 32px;text-align:center;margin-bottom:0"><p style="margin:0 0 4px;color:#d3b56d;font-size:11px;letter-spacing:.16em;text-transform:uppercase">SoCal Autoworks · Comprehensive Inspection</p>
-        <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700">${insp.vehicle_year} ${insp.vehicle_make} ${insp.vehicle_model}</h1>
-        ${vehicleSubtitle ? `<p style="margin:8px 0 0;color:rgba(255,255,255,.7);font-size:14px">${vehicleSubtitle}</p>` : ""}
-        ${insp.vehicle_vin ? `<p style="margin:4px 0 0;color:rgba(255,255,255,.4);font-size:11px">VIN: ${insp.vehicle_vin}</p>` : ""}
+    <div style="background:#20251f;border-radius:16px 16px 0 0;overflow:hidden;text-align:center;border-bottom:none">
+      ${checkinPhotos[0]?.photo_url ? `<img src="${esc(checkinPhotos[0].photo_url)}" alt="${esc(`${insp.vehicle_year} ${insp.vehicle_make} ${insp.vehicle_model}`)}" style="display:block;width:100%;height:280px;object-fit:cover;opacity:.82" />` : ""}
+      <div style="padding:28px 32px 32px;background:linear-gradient(135deg,#20251f,#3d463a)">
+        <img src="https://phefpvsqgjkeivzrrlmz.supabase.co/storage/v1/object/public/brand/logo.png" alt="SoCal Autoworks" style="height:48px;object-fit:contain;margin:0 auto 20px;display:block" />
+        <p style="margin:0 0 7px;color:#d3b56d;font-size:10px;font-weight:800;letter-spacing:.2em;text-transform:uppercase">The complete story of your vehicle</p>
+        <p style="margin:0 0 4px;color:rgba(255,255,255,.55);font-size:10px;letter-spacing:.16em;text-transform:uppercase">Comprehensive Inspection</p>
+        <h1 style="margin:0;color:#fff;font-size:30px;line-height:1.1;font-weight:800">${insp.vehicle_year} ${insp.vehicle_make} ${insp.vehicle_model}</h1>
+        ${vehicleSubtitle ? `<p style="margin:10px 0 0;color:rgba(255,255,255,.7);font-size:14px">${vehicleSubtitle}</p>` : ""}
+        ${insp.vehicle_vin ? `<p style="margin:5px 0 0;color:rgba(255,255,255,.4);font-size:11px">VIN: ${esc(insp.vehicle_vin)}</p>` : ""}
       </div>
     </div>
 
@@ -189,7 +197,7 @@ Deno.serve(async (req: Request) => {
       <!-- Greeting -->
       <p style="margin:0 0 24px;font-size:15px;color:#111827">Dear ${insp.customer_first_name},</p>
       <p style="margin:0 0 24px;font-size:14px;color:#6b7280;line-height:1.6">
-        This report documents what we observed, why it matters and the next steps we recommend.
+        This report turns several hours of hands-on inspection into a clear visual record of what we observed, why it matters and the next steps we recommend.
       </p>
       <table width="100%" cellspacing="6" style="margin-bottom:22px;text-align:center"><tr>${[["Good",good.length,"#dcfce7"],["Monitor",monitor.length,"#fef3c7"],["Attention",needsAttention.length,"#fee2e2"],["Not inspected",notInspected.length,"#f3f4f6"]].map(([l,n,b])=>`<td style="width:25%;background:${b};border-radius:9px;padding:10px 4px"><strong style="display:block;font-size:20px">${n}</strong><span style="font-size:9px;text-transform:uppercase">${l}</span></td>`).join("")}</tr></table>
       ${insp.executive_summary?`<div style="border-left:4px solid #b7954f;background:#fafaf9;padding:16px 18px;margin-bottom:18px"><b style="font-size:10px;text-transform:uppercase;color:#78716c">Executive Summary</b><p style="font-size:14px;line-height:1.65;color:#374151">${esc(insp.executive_summary)}</p></div>`:""}${insp.primary_recommendation?`<div style="background:#2f372d;color:#fff;border-radius:12px;padding:16px 18px;margin-bottom:22px"><b style="color:#d3b56d;font-size:10px;text-transform:uppercase">Recommended next step</b><p style="font-size:14px;line-height:1.6">${esc(insp.primary_recommendation)}</p></div>`:""}
@@ -207,6 +215,9 @@ Deno.serve(async (req: Request) => {
         </div>
       </div>
       ${guidanceHtml}
+      <div style="background:#252b24;color:#fff;border-radius:12px;padding:18px 20px;margin:0 0 26px;text-align:center"><span style="display:block;color:#d3b56d;font-size:9px;font-weight:800;letter-spacing:.18em;text-transform:uppercase">Condition Index</span><strong style="display:block;margin-top:4px;font-size:38px;line-height:1">${conditionIndex}</strong><span style="display:block;margin-top:6px;font-size:11px;color:rgba(255,255,255,.6)">${inspectedCount} items across ${sections.length} systems</span></div>
+
+      ${healthMapHtml}
 
       <!-- Findings -->
       ${needsAttentionHtml}
