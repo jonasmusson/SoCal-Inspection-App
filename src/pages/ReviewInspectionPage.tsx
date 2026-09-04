@@ -30,7 +30,6 @@ export function ReviewInspectionPage() {
   const [sections, setSections] = useState<InspectionSection[]>([]);
   const [items, setItems] = useState<InspectionItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
 
@@ -42,6 +41,7 @@ export function ReviewInspectionPage() {
   const [primaryRecommendation, setPrimaryRecommendation] = useState('');
   const [photos, setPhotos] = useState<InspectionPhoto[]>([]);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => { if (id) loadInspection(id); }, [id]);
   useEffect(() => { if (!isManager && !isOwner) navigate('/'); }, [isManager, isOwner, navigate]);
@@ -50,35 +50,35 @@ export function ReviewInspectionPage() {
     setLoading(true);
     setLoadError(false);
     try {
-      const { data } = await withTimeout(
-        supabase.from('inspections').select('*').eq('id', inspectionId).single(),
-      );
-      if (data) {
-        setInspection(data);
-        setOverall(data.overall_condition);
-        setGuidance(data.investment_guidance || '');
-        setManagerNotes(data.manager_notes || '');
-        setExecutiveSummary(data.executive_summary || ''); setPrimaryRecommendation(data.primary_recommendation || '');
-        const { data: secData } = await supabase
-          .from('inspection_sections').select('*').eq('inspection_id', inspectionId).order('section_number');
-        setSections(secData || []);
-        if (secData?.length) {
-          const { data: itemData } = await supabase
-            .from('inspection_items').select('*').in('section_id', secData.map(s => s.id)).order('created_at');
-          const loaded = itemData || [];
-          setItems(loaded);
-          const p: Record<string, PriorityLevel> = {};
-          loaded.forEach(i => { if (i.priority) p[i.id] = i.priority as PriorityLevel; });
-          setPriorities(p);
-          if (loaded.length > 0) {
-            const { data: photoData } = await supabase.from('inspection_photos').select('*').in('item_id', loaded.map(i=>i.id)); setPhotos(photoData || []);
-          } else {
-            setPhotos([]);
-          }
+    const { data, error } = await withTimeout(supabase.from('inspections').select('*').eq('id', inspectionId).single());
+    if (error) throw error;
+    if (data) {
+      setInspection(data);
+      setOverall(data.overall_condition);
+      setGuidance(data.investment_guidance || '');
+      setManagerNotes(data.manager_notes || '');
+      setExecutiveSummary(data.executive_summary || ''); setPrimaryRecommendation(data.primary_recommendation || '');
+      const { data: secData, error: sectionError } = await withTimeout(supabase
+        .from('inspection_sections').select('*').eq('inspection_id', inspectionId).order('section_number'));
+      if (sectionError) throw sectionError;
+      setSections(secData || []);
+      if (secData?.length) {
+        const { data: itemData, error: itemError } = await withTimeout(supabase
+          .from('inspection_items').select('*').in('section_id', secData.map(s => s.id)).order('created_at'));
+        if (itemError) throw itemError;
+        const loaded = itemData || [];
+        setItems(loaded);
+        const p: Record<string, PriorityLevel> = {};
+        loaded.forEach(i => { if (i.priority) p[i.id] = i.priority as PriorityLevel; });
+        setPriorities(p);
+        if (loaded.length) {
+          const { data: photoData } = await withTimeout(supabase.from('inspection_photos').select('*').in('item_id', loaded.map(i=>i.id)));
+          setPhotos(photoData || []);
         } else {
           setPhotos([]);
         }
       }
+    }
     } catch {
       setLoadError(true);
     } finally {
@@ -190,16 +190,7 @@ export function ReviewInspectionPage() {
   }
 
   if (loading) return <div className="p-4 text-center text-gray-500">Loading...</div>;
-  if (loadError) return (
-    <div className="p-4 text-center py-12">
-      <AlertTriangle className="w-12 h-12 text-danger-300 mx-auto mb-3" />
-      <p className="text-gray-600 mb-4">Unable to load the inspection for review. Check your connection and try again.</p>
-      <button onClick={() => id && loadInspection(id)}
-        className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl">
-        Try Again
-      </button>
-    </div>
-  );
+  if (loadError) return <div className="p-6 text-center"><p className="text-gray-600 mb-3">The report could not be loaded.</p><button onClick={() => id && loadInspection(id)} className="px-4 py-2 rounded-xl bg-primary-600 text-white font-medium">Try Again</button></div>;
   if (!inspection) return <div className="p-4 text-center text-gray-500">Not found</div>;
 
   const needsAttention = items.filter(i => i.status === 'needs_attention');
@@ -213,11 +204,11 @@ export function ReviewInspectionPage() {
   const colorMeta = VEHICLE_COLORS.find(c => c.name === inspection.vehicle_color);
 
   return (
-    <div className="pb-[160px]">
+    <div className="pb-28">
       {/* Header */}
       <div className="sticky top-0 bg-white border-b border-gray-200 z-10 px-4 py-3">
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => navigate(`/inspection/${id}`)} className="text-gray-600" aria-label="Back to inspection">
+          <button aria-label="Back to inspection" onClick={() => navigate(`/inspection/${id}`)} className="text-gray-600">
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div className="flex-1 min-w-0">
@@ -402,8 +393,8 @@ export function ReviewInspectionPage() {
         </div>
       )}
 
-      {/* Bottom action — sits above the 72px Layout nav */}
-      <div className="fixed bottom-[72px] left-0 right-0 bg-white border-t border-gray-200 p-4 z-30">
+      {/* Bottom action */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
         {feedback && <p role="status" className={`text-xs text-center mb-2 font-medium ${feedback.type === 'success' ? 'text-success-700' : 'text-danger-700'}`}>
           {feedback.message}
         </p>}
