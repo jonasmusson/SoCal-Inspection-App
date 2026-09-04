@@ -399,8 +399,12 @@ export function ReviewInspectionPage() {
         </div>
       )}
 
-      {/* Bottom action */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+      {/* Keep review actions within the document while previewing so they do not
+          obscure the customer-facing report. The edit view retains the fixed bar. */}
+      <div className={`${activeTab === 'preview'
+        ? 'mx-4 mb-8 rounded-xl border border-gray-200 bg-white p-4 shadow-sm'
+        : 'fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]'
+      } print:hidden`}>
         {feedback && <p role="status" className={`text-xs text-center mb-2 font-medium ${feedback.type === 'success' ? 'text-success-700' : 'text-danger-700'}`}>
           {feedback.message}
         </p>}
