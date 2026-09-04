@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Inspection, InspectionSection, InspectionItem, InspectionPhoto, ItemCondition, PriorityLevel } from '../types';
+import { Inspection, InspectionSection, InspectionItem, InspectionPhoto, CheckinPhoto, ItemCondition, PriorityLevel } from '../types';
 import { VEHICLE_COLORS } from '../data/vehicleColors';
 import { ArrowLeft, Check, AlertTriangle, Eye, Send, Eye as Preview, ClipboardList, MinusCircle, Printer, Save } from 'lucide-react';
 import { withTimeout } from '../lib/async';
+import { PremiumInspectionReport } from '../components/report/PremiumInspectionReport';
 
 const PRIORITY_OPTIONS: { value: PriorityLevel; label: string; color: string; bg: string }[] = [
   { value: 'immediate',  label: 'Immediate',   color: 'text-danger-700',  bg: 'bg-danger-100 border-danger-300'  },
@@ -40,6 +41,7 @@ export function ReviewInspectionPage() {
   const [executiveSummary, setExecutiveSummary] = useState('');
   const [primaryRecommendation, setPrimaryRecommendation] = useState('');
   const [photos, setPhotos] = useState<InspectionPhoto[]>([]);
+  const [checkinPhotos, setCheckinPhotos] = useState<CheckinPhoto[]>([]);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -54,6 +56,9 @@ export function ReviewInspectionPage() {
     if (error) throw error;
     if (data) {
       setInspection(data);
+      const { data: checkinPhotoData } = await withTimeout(supabase
+        .from('checkin_photos').select('*').eq('inspection_id', inspectionId).order('created_at'));
+      setCheckinPhotos(checkinPhotoData || []);
       setOverall(data.overall_condition);
       setGuidance(data.investment_guidance || '');
       setManagerNotes(data.manager_notes || '');
@@ -376,7 +381,7 @@ export function ReviewInspectionPage() {
       {/* ── PREVIEW TAB ── */}
       {activeTab === 'preview' && (
         <div className="p-4">
-          <ReportPreview
+          <PremiumInspectionReport
             inspection={inspection}
             sections={sections}
             needsAttention={needsAttention}
@@ -389,6 +394,7 @@ export function ReviewInspectionPage() {
             managerNotes={managerNotes}
             executiveSummary={executiveSummary} primaryRecommendation={primaryRecommendation}
             colorMeta={colorMeta}
+            checkinPhotos={checkinPhotos}
           />
         </div>
       )}
@@ -438,7 +444,7 @@ interface PreviewProps {
   colorMeta: { hex: string } | undefined;
 }
 
-function ReportPreview({ inspection, sections, needsAttention, monitor, good, notInspected, photos, priorities, overall, guidance, managerNotes, executiveSummary, primaryRecommendation, colorMeta }: PreviewProps) {
+export function ReportPreview({ inspection, sections, needsAttention, monitor, good, notInspected, photos, priorities, overall, guidance, managerNotes, executiveSummary, primaryRecommendation, colorMeta }: PreviewProps) {
   const conditionConfig = {
     good:            { label: 'All Good', bg: 'bg-success-100', text: 'text-success-700', border: 'border-success-300' },
     monitor:         { label: 'Monitor',  bg: 'bg-warning-100', text: 'text-warning-700', border: 'border-warning-300' },
