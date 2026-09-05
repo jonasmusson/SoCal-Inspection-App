@@ -1,11 +1,13 @@
 import {
-  AlertTriangle, ArrowRight, Camera, CheckCircle2, CircleSlash2,
-  Clock3, Eye, Gauge, Printer, ShieldCheck, Sparkles, Wrench,
+  ArrowRight, Printer, Sparkles,
 } from 'lucide-react';
 import {
   CheckinPhoto, Inspection, InspectionItem, InspectionPhoto,
   InspectionSection, ItemCondition, PriorityLevel,
 } from '../../types';
+import {
+  findIllustrationFocusZone, findReportVehicleIllustration, ReportVehicleIllustration,
+} from '../../data/reportVehicleIllustrations';
 
 interface PremiumInspectionReportProps {
   inspection: Inspection;
@@ -53,27 +55,10 @@ const SYSTEM_ACCENT: Record<ReportSystemStatus, string> = {
   not_inspected: '#8a8b84',
 };
 
-function focusZoneForSystem(name: string) {
-  const key = name.toLowerCase();
-  if (key.includes('engine')) return { left: '20%', top: '29%', width: '31%', height: '34%' };
-  if (key.includes('cool')) return { left: '6%', top: '27%', width: '25%', height: '39%' };
-  if (key.includes('brake')) return { left: '23%', top: '59%', width: '21%', height: '29%' };
-  if (key.includes('suspension') || key.includes('steering')) return { left: '16%', top: '57%', width: '37%', height: '34%' };
-  if (key.includes('wheel') || key.includes('tire')) return { left: '77%', top: '49%', width: '21%', height: '36%' };
-  if (key.includes('transmission')) return { left: '43%', top: '48%', width: '22%', height: '25%' };
-  if (key.includes('driveline')) return { left: '53%', top: '55%', width: '35%', height: '22%' };
-  if (key.includes('fuel')) return { left: '68%', top: '30%', width: '27%', height: '31%' };
-  if (key.includes('exhaust')) return { left: '48%', top: '53%', width: '42%', height: '22%' };
-  if (key.includes('electric')) return { left: '25%', top: '23%', width: '66%', height: '39%' };
-  if (key.includes('under')) return { left: '17%', top: '52%', width: '72%', height: '32%' };
-  if (key.includes('test') || key.includes('drive')) return { left: '4%', top: '9%', width: '92%', height: '78%' };
-  return { left: '18%', top: '12%', width: '76%', height: '52%' };
-}
-
-function PremiumCutawayArtwork({ focus, accent = '#b7954f' }: { focus?: string; accent?: string }) {
-  const zone = focus ? focusZoneForSystem(focus) : null;
+function PremiumCutawayArtwork({ illustration, focus, accent = '#b7954f' }: { illustration: ReportVehicleIllustration; focus?: string; accent?: string }) {
+  const zone = focus ? findIllustrationFocusZone(illustration, focus) : null;
   return <div className="relative h-full w-full overflow-hidden rounded-2xl bg-[#f4f0e5]">
-    <img src="/k5-premium-cutaway.webp" alt="Detailed classic Chevrolet K5 Blazer mechanical cutaway" className="h-full w-full object-contain" />
+    <img src={illustration.src} alt={illustration.alt} className="h-full w-full object-contain" />
     {focus && zone && <>
       <div className="absolute rounded-[45%] border-2 shadow-[0_0_0_999px_rgba(26,31,26,.28)]" style={{ ...zone, borderColor: accent, boxShadow: `0 0 0 999px rgba(26,31,26,.28), 0 0 28px ${accent}66` }} />
       <span className="absolute left-4 top-4 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[.17em] text-white shadow-lg" style={{ backgroundColor: accent }}>{focus}</span>
@@ -81,8 +66,9 @@ function PremiumCutawayArtwork({ focus, accent = '#b7954f' }: { focus?: string; 
   </div>;
 }
 
-function SystemIllustration({ name, status }: { name: string; status: ReportSystemStatus }) {
-  return <PremiumCutawayArtwork focus={name} accent={SYSTEM_ACCENT[status]} />;
+function SystemIllustration({ illustration, name, status }: { illustration?: ReportVehicleIllustration; name: string; status: ReportSystemStatus }) {
+  if (!illustration) return <div className="flex h-full w-full items-end rounded-2xl border border-white/10 bg-gradient-to-br from-[#293028] to-[#151915] p-6"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#d3b56d]">Vehicle-specific artwork coming soon</p><p className="mt-2 text-2xl font-black text-white">{name}</p></div></div>;
+  return <PremiumCutawayArtwork illustration={illustration} focus={name} accent={SYSTEM_ACCENT[status]} />;
 }
 
 export function PremiumInspectionReport({
@@ -107,6 +93,7 @@ export function PremiumInspectionReport({
   const planningTotalLow = totalLaborCostLow + totalPartsLow;
   const planningTotalHigh = totalLaborCostHigh + totalPartsHigh;
   const vehicleName = `${inspection.vehicle_year} ${inspection.vehicle_make} ${inspection.vehicle_model}`;
+  const vehicleIllustration = findReportVehicleIllustration(inspection.vehicle_year, inspection.vehicle_make, inspection.vehicle_model);
   const reportDate = new Date(inspection.completed_at || inspection.updated_at || inspection.created_at)
     .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const heroPhoto = checkinPhotos[0]?.photo_url;
@@ -132,10 +119,10 @@ export function PremiumInspectionReport({
   }
 
   const summaryCards = [
-    { label: 'Good', value: good.length, icon: CheckCircle2, tone: 'bg-emerald-50 text-emerald-800 border-emerald-200', bar: 'bg-emerald-500' },
-    { label: 'Monitor', value: monitor.length, icon: Eye, tone: 'bg-amber-50 text-amber-800 border-amber-200', bar: 'bg-amber-500' },
-    { label: 'Attention', value: needsAttention.length, icon: AlertTriangle, tone: 'bg-red-50 text-red-800 border-red-200', bar: 'bg-red-500' },
-    { label: 'Not inspected', value: notInspected.length, icon: CircleSlash2, tone: 'bg-stone-100 text-stone-700 border-stone-200', bar: 'bg-stone-400' },
+    { label: 'Good', value: good.length, tone: 'bg-emerald-50 text-emerald-800 border-emerald-200', bar: 'bg-emerald-500' },
+    { label: 'Monitor', value: monitor.length, tone: 'bg-amber-50 text-amber-800 border-amber-200', bar: 'bg-amber-500' },
+    { label: 'Attention', value: needsAttention.length, tone: 'bg-red-50 text-red-800 border-red-200', bar: 'bg-red-500' },
+    { label: 'Not inspected', value: notInspected.length, tone: 'bg-stone-100 text-stone-700 border-stone-200', bar: 'bg-stone-400' },
   ];
   const roadmapGroups = (['immediate', 'short_term', 'long_term', 'upgrade'] as PriorityLevel[]).map(priority => ({
     priority,
@@ -160,9 +147,9 @@ export function PremiumInspectionReport({
           {heroPhoto && <img src={heroPhoto} alt={vehicleName} className="absolute inset-0 h-full w-full object-cover opacity-20" />}
           <div className="absolute inset-0 bg-gradient-to-b from-[#11150f]/75 via-[#20251f]/72 to-[#171b16]" />
           <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#171b16] via-[#171b16]/85 to-transparent" />
-          <div className="pointer-events-none absolute left-1/2 top-20 h-60 w-[82%] max-w-3xl -translate-x-1/2 overflow-hidden rounded-2xl border border-[#d3b56d]/40 bg-[#f4f0e5] shadow-2xl">
-            <PremiumCutawayArtwork accent={vehicleColor} />
-          </div>
+          {vehicleIllustration && <div className="pointer-events-none absolute left-1/2 top-20 h-60 w-[82%] max-w-3xl -translate-x-1/2 overflow-hidden rounded-2xl border border-[#d3b56d]/40 bg-[#f4f0e5] shadow-2xl">
+            <PremiumCutawayArtwork illustration={vehicleIllustration} accent={vehicleColor} />
+          </div>}
           <div className="relative z-10 flex min-h-[520px] flex-col px-6 py-7 sm:px-10 sm:py-9">
             <div className="flex items-start justify-between gap-4 border-b border-white/20 pb-5">
               <span className="inline-flex rounded-md bg-white px-2.5 py-1.5 shadow-sm">
@@ -200,8 +187,7 @@ export function PremiumInspectionReport({
             <div className="relative flex min-h-48 items-center justify-center rounded-2xl bg-[#252b24] p-6 text-white">
               <div className="absolute inset-3 rounded-xl border border-white/10" />
               <div className="relative text-center">
-                <Gauge className="mx-auto h-7 w-7 text-[#d3b56d]" />
-                <p className="mt-2 text-6xl font-black">{score}</p>
+                <p className="text-6xl font-black">{score}</p>
                 <p className="text-[10px] font-bold uppercase tracking-[.22em] text-white/55">Condition index</p>
                 <p className="mt-2 inline-flex rounded-full border border-[#d3b56d]/40 bg-[#d3b56d]/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#d3b56d]">{overallLabel}</p>
                 <p className="mt-3 text-xs text-white/60">{inspectedCount} items · {sections.length} systems</p>
@@ -213,8 +199,7 @@ export function PremiumInspectionReport({
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {summaryCards.map(card => <div key={card.label} className={`relative overflow-hidden rounded-2xl border p-4 ${card.tone}`}>
                 <div className={`absolute inset-x-0 top-0 h-1 ${card.bar}`} />
-                <card.icon className="h-5 w-5 opacity-75" />
-                <p className="mt-5 text-3xl font-black">{card.value}</p>
+                <p className="mt-3 text-3xl font-black">{card.value}</p>
                 <p className="mt-1 text-[10px] font-bold uppercase tracking-widest">{card.label}</p>
               </div>)}
             </div>
@@ -247,7 +232,7 @@ export function PremiumInspectionReport({
                   <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-red-500" />Attention</span>
                 </div>
               </div>
-              <div className="min-h-[290px] p-4"><PremiumCutawayArtwork accent={vehicleColor} /></div>
+              <div className="min-h-[290px] p-4">{vehicleIllustration ? <PremiumCutawayArtwork illustration={vehicleIllustration} accent={vehicleColor} /> : heroPhoto ? <img src={heroPhoto} alt={vehicleName} className="h-full min-h-[260px] w-full rounded-2xl object-cover" /> : <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-8 text-center text-xs font-bold uppercase tracking-[.18em] text-white/35">Vehicle-specific illustration not yet available</div>}</div>
             </div>
             <div className="grid grid-cols-5 border-t border-white/10 bg-black/15 px-5 py-4 text-center text-[8px] font-bold uppercase tracking-widest text-[#d3b56d] sm:text-[9px]">
               <span>Structure</span><span>Power</span><span>Control</span><span>Safety</span><span>Road</span>
@@ -270,7 +255,7 @@ export function PremiumInspectionReport({
                     <div className={`relative flex min-h-[270px] items-center justify-center overflow-hidden bg-[#20261f] p-8 ${index % 2 ? 'lg:order-2' : ''}`}>
                       <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.3) 1px, transparent 1px)', backgroundSize: '34px 34px' }} />
                       <div className="absolute left-5 top-5 flex items-center gap-3"><span className="text-4xl font-black text-white/10">{String(index + 1).padStart(2, '0')}</span><span className="h-px w-12 bg-white/20" /></div>
-                      <div className="relative h-56 w-full max-w-lg opacity-95"><SystemIllustration name={section.section_name} status={status as ReportSystemStatus} /></div>
+                      <div className="relative h-56 w-full max-w-lg opacity-95"><SystemIllustration illustration={vehicleIllustration} name={section.section_name} status={status as ReportSystemStatus} /></div>
                       <span className="absolute bottom-5 left-5 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-[.14em]" style={{ color: accent, borderColor: `${accent}66`, backgroundColor: `${accent}18` }}>{statusLabel}</span>
                       <span className="absolute bottom-6 right-5 text-[9px] font-bold uppercase tracking-widest text-white/30">SoCal inspection chapter</span>
                     </div>
@@ -282,7 +267,7 @@ export function PremiumInspectionReport({
                       <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-stone-100"><div className="h-full rounded-full" style={{ width: `${total ? Math.max(8, Math.round(((passed + watching + attention) / total) * 100)) : 0}%`, backgroundColor: accent }} /></div>
                       <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-stone-400">{total} checks completed · {passed} good{watching ? ` · ${watching} monitor` : ''}{attention ? ` · ${attention} attention` : ''}{skipped ? ` · ${skipped} not inspected` : ''}</p>
 
-                      {highlightedItems.length > 0 ? <div className="mt-5 space-y-3">{highlightedItems.slice(0, 3).map(item => <div key={item.id} className="border-l-2 pl-4" style={{ borderColor: accent }}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-black text-stone-800">{item.item_name}</p><span className="text-[8px] font-black uppercase tracking-wider" style={{ color: accent }}>{item.status === 'needs_attention' ? 'Needs attention' : 'Monitor'}</span></div>{item.notes && <p className="mt-1 text-xs leading-5 text-stone-600">{item.notes}</p>}{item.recommended_action && <p className="mt-1 text-[10px] font-semibold leading-4 text-stone-500"><span className="uppercase tracking-wider text-[#8a6b30]">Next step:</span> {item.recommended_action}</p>}</div>)}</div> : <div className="mt-5 rounded-xl bg-emerald-50 p-4"><div className="flex items-center gap-2 text-sm font-black text-emerald-800"><CheckCircle2 className="h-4 w-4" />No concerns identified</div><p className="mt-1 text-xs leading-5 text-emerald-900/65">All inspected points in this system performed or presented satisfactorily at the time of inspection.</p></div>}
+                      {highlightedItems.length > 0 ? <div className="mt-5 space-y-3">{highlightedItems.slice(0, 3).map(item => <div key={item.id} className="border-l-2 pl-4" style={{ borderColor: accent }}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-black text-stone-800">{item.item_name}</p><span className="text-[8px] font-black uppercase tracking-wider" style={{ color: accent }}>{item.status === 'needs_attention' ? 'Needs attention' : 'Monitor'}</span></div>{item.notes && <p className="mt-1 text-xs leading-5 text-stone-600">{item.notes}</p>}{item.recommended_action && <p className="mt-1 text-[10px] font-semibold leading-4 text-stone-500"><span className="uppercase tracking-wider text-[#8a6b30]">Next step:</span> {item.recommended_action}</p>}</div>)}</div> : <div className="mt-5 rounded-xl bg-emerald-50 p-4"><div className="flex items-center gap-2 text-sm font-black text-emerald-800"><span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />No concerns identified</div><p className="mt-1 text-xs leading-5 text-emerald-900/65">All inspected points in this system performed or presented satisfactorily at the time of inspection.</p></div>}
 
                       <div className="mt-auto pt-5"><p className="text-[8px] font-black uppercase tracking-[.18em] text-stone-400">Inspection coverage</p><p className="mt-1 text-[10px] leading-5 text-stone-500">{sectionItems.slice(0, 6).map(item => item.item_name).join(' · ')}{sectionItems.length > 6 ? ` · +${sectionItems.length - 6} more` : ''}</p></div>
                     </div>
@@ -299,9 +284,9 @@ export function PremiumInspectionReport({
               <div className="rounded-2xl bg-[#252b24] p-5 text-white shadow-lg"><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#d3b56d]">Preliminary project range</p><p className="mt-2 text-3xl font-black">{money(planningTotalLow)}–{money(planningTotalHigh)}</p><p className="mt-2 text-[10px] leading-4 text-white/50">Planning guidance only · not an estimate or authorization</p></div>
             </div>
             <div className="grid border-t border-[#cfc4a8] sm:grid-cols-3">
-              <div className="flex items-center gap-3 border-b border-[#cfc4a8] p-5 sm:border-b-0 sm:border-r"><Clock3 className="h-6 w-6 text-[#8a6b30]" /><div><p className="text-[9px] uppercase tracking-widest text-stone-500">Labor time</p><p className="text-lg font-black">{totalLaborLow}–{totalLaborHigh} hours</p></div></div>
-              <div className="flex items-center gap-3 border-b border-[#cfc4a8] p-5 sm:border-b-0 sm:border-r"><Wrench className="h-6 w-6 text-[#8a6b30]" /><div><p className="text-[9px] uppercase tracking-widest text-stone-500">Labor planning</p><p className="text-lg font-black">{money(totalLaborCostLow)}–{money(totalLaborCostHigh)}</p></div></div>
-              <div className="flex items-center gap-3 p-5"><Wrench className="h-6 w-6 text-[#8a6b30]" /><div><p className="text-[9px] uppercase tracking-widest text-stone-500">Parts planning</p><p className="text-lg font-black">{money(totalPartsLow)}–{money(totalPartsHigh)}</p></div></div>
+              <div className="border-b border-[#cfc4a8] p-5 sm:border-b-0 sm:border-r"><p className="text-[9px] font-black uppercase tracking-widest text-[#8a6b30]">Labor time</p><p className="mt-2 text-lg font-black">{totalLaborLow}–{totalLaborHigh} hours</p></div>
+              <div className="border-b border-[#cfc4a8] p-5 sm:border-b-0 sm:border-r"><p className="text-[9px] font-black uppercase tracking-widest text-[#8a6b30]">Labor planning</p><p className="mt-2 text-lg font-black">{money(totalLaborCostLow)}–{money(totalLaborCostHigh)}</p></div>
+              <div className="p-5"><p className="text-[9px] font-black uppercase tracking-widest text-[#8a6b30]">Parts planning</p><p className="mt-2 text-lg font-black">{money(totalPartsLow)}–{money(totalPartsHigh)}</p></div>
             </div>
             <p className="border-t border-[#cfc4a8] px-6 py-4 text-[10px] leading-5 text-stone-600 sm:px-8">Labor planning uses the current shop rate of {money(laborRate)} per hour. Final pricing may change after disassembly, diagnosis, parts selection and availability. No work is authorized by this report.</p>
           </section>}
@@ -340,7 +325,7 @@ export function PremiumInspectionReport({
                 return <article data-report-card key={item.id} className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
                   <div className="grid lg:grid-cols-[.8fr_1.2fr]">
                     <div className="relative min-h-56 bg-[#262d25]">
-                      {itemPhotos[0] ? <img src={itemPhotos[0].photo_url} alt={item.item_name} className="absolute inset-0 h-full w-full object-cover" /> : <div className="flex h-full min-h-56 items-center justify-center"><Camera className="h-10 w-10 text-white/20" /></div>}
+                      {itemPhotos[0] ? <img src={itemPhotos[0].photo_url} alt={item.item_name} className="absolute inset-0 h-full w-full object-cover" /> : <div className="flex h-full min-h-56 items-center justify-center px-8 text-center text-[10px] font-black uppercase tracking-[.2em] text-white/25">Evidence photo not captured</div>}
                       <span className="absolute left-4 top-4 rounded-full bg-black/65 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">Finding {String(index + 1).padStart(2, '0')}</span>
                     </div>
                     <div className="p-5 sm:p-7">
@@ -364,12 +349,12 @@ export function PremiumInspectionReport({
             <h2 className="mt-2 text-2xl font-black text-[#252b24]">Not urgent. Not forgotten.</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">{monitor.map(item => {
               const section = sections.find(s => s.id === item.section_id);
-              return <div key={item.id} className="rounded-xl border border-amber-200 bg-amber-50 p-4"><div className="flex items-center gap-2"><Eye className="h-4 w-4 text-amber-700" /><p className="font-bold text-stone-800">{item.item_name}</p></div><p className="mt-1 text-[10px] uppercase tracking-wide text-stone-500">{section?.section_name}</p>{item.notes && <p className="mt-2 text-sm leading-6 text-stone-600">{item.notes}</p>}</div>;
+              return <div key={item.id} className="rounded-xl border border-amber-200 bg-amber-50 p-4"><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /><p className="font-bold text-stone-800">{item.item_name}</p></div><p className="mt-1 text-[10px] uppercase tracking-wide text-stone-500">{section?.section_name}</p>{item.notes && <p className="mt-2 text-sm leading-6 text-stone-600">{item.notes}</p>}</div>;
             })}</div>
           </section>}
 
           {good.length > 0 && <section data-report-card className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 sm:p-8">
-            <div className="flex items-start gap-4"><ShieldCheck className="h-10 w-10 flex-none text-emerald-700" /><div><p className="text-[10px] font-black uppercase tracking-[.22em] text-emerald-800">Passed inspection</p><h2 className="mt-1 text-2xl font-black text-[#1f3528]">{good.length} checks gave us confidence.</h2><p className="mt-2 text-sm leading-6 text-emerald-900/70">Passed items are summarized by system so the report stays useful without burying the important findings.</p></div></div>
+            <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-start"><p className="text-6xl font-black leading-none text-emerald-700">{good.length}</p><div><p className="text-[10px] font-black uppercase tracking-[.22em] text-emerald-800">Passed inspection</p><h2 className="mt-1 text-2xl font-black text-[#1f3528]">Checks that gave us confidence.</h2><p className="mt-2 text-sm leading-6 text-emerald-900/70">Passed items are summarized by system so the report stays useful without burying the important findings.</p></div></div>
             <div className="mt-5 grid gap-2 sm:grid-cols-2">{sectionRows.filter(row => row.passed > 0).map(row => <div key={row.section.id} className="flex items-center justify-between rounded-lg bg-white/65 px-3 py-2"><span className="text-sm font-semibold text-stone-700">{row.section.section_name}</span><span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">{row.passed} passed</span></div>)}</div>
           </section>}
 
