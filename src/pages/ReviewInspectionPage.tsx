@@ -44,6 +44,7 @@ export function ReviewInspectionPage() {
   const [checkinPhotos, setCheckinPhotos] = useState<CheckinPhoto[]>([]);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [laborRate, setLaborRate] = useState(175);
 
   useEffect(() => { if (id) loadInspection(id); }, [id]);
   useEffect(() => { if (!isManager && !isOwner) navigate('/'); }, [isManager, isOwner, navigate]);
@@ -56,6 +57,10 @@ export function ReviewInspectionPage() {
     if (error) throw error;
     if (data) {
       setInspection(data);
+      const { data: laborRateSetting } = await withTimeout(supabase
+        .from('shop_settings').select('value').eq('key', 'labor_rate').maybeSingle());
+      const configuredLaborRate = Number(laborRateSetting?.value);
+      if (Number.isFinite(configuredLaborRate) && configuredLaborRate > 0) setLaborRate(configuredLaborRate);
       const { data: checkinPhotoData } = await withTimeout(supabase
         .from('checkin_photos').select('*').eq('inspection_id', inspectionId).order('created_at'));
       setCheckinPhotos(checkinPhotoData || []);
@@ -395,6 +400,7 @@ export function ReviewInspectionPage() {
             executiveSummary={executiveSummary} primaryRecommendation={primaryRecommendation}
             colorMeta={colorMeta}
             checkinPhotos={checkinPhotos}
+            laborRate={laborRate}
           />
         </div>
       )}
