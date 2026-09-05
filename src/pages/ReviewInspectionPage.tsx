@@ -431,13 +431,20 @@ export function ReviewInspectionPage() {
         {!reportReady && <p className="text-xs text-center text-warning-700 mb-2 font-medium">
           {!overall ? 'Select an overall assessment' : !executiveSummary.trim() ? 'Add the Executive Summary' : needsAttention.length > 0 && !primaryRecommendation.trim() ? 'Add the Recommended Next Step' : 'Set a priority for every item requiring attention'}
         </p>}
+        {(inspection.report_approved || inspection.status === 'approved' || inspection.status === 'sent') && inspection.report_access_token && (
+          <div className="mx-auto mb-3 flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-xl border border-success-200 bg-success-50 px-4 py-3">
+            <div><p className="text-sm font-semibold text-success-800">Customer report is ready</p><p className="text-xs text-success-700">Private link · no app login required</p></div>
+            <div className="flex gap-2">
+              <a href={`/report/${inspection.report_access_token}`} target="_blank" rel="noreferrer"
+                className="rounded-lg border border-success-300 bg-white px-3 py-2 text-xs font-semibold text-success-800 hover:bg-success-100">Open Customer View</a>
+              <button onClick={copyCustomerReportLink} disabled={saving}
+                className="flex items-center gap-1.5 rounded-lg bg-success-700 px-3 py-2 text-xs font-semibold text-white hover:bg-success-800 disabled:opacity-50">
+                <LinkIcon className="h-4 w-4" /> Copy Link
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex gap-3 max-w-3xl mx-auto">
-          {(inspection.report_approved || inspection.status === 'approved' || inspection.status === 'sent') && (
-            <button onClick={copyCustomerReportLink} disabled={saving}
-              className="flex-1 py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-              <LinkIcon className="w-5 h-5" /> <span className="hidden sm:inline">Copy Report Link</span><span className="sm:hidden">Copy Link</span>
-            </button>
-          )}
           <button onClick={saveDraft} disabled={saving}
             className="flex-1 py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50">
             <Save className="w-5 h-5" /> {saving ? 'Saving...' : 'Save Draft'}
