@@ -53,66 +53,36 @@ const SYSTEM_ACCENT: Record<ReportSystemStatus, string> = {
   not_inspected: '#8a8b84',
 };
 
-function CutawayVehicleDiagram({ color, focus }: { color: string; focus?: string }) {
-  const focusKey = focus?.toLowerCase() || '';
-  const focusZone = focusKey.includes('engine') ? { x: 338, y: 220, rx: 92, ry: 66 }
-    : focusKey.includes('cool') ? { x: 248, y: 222, rx: 54, ry: 72 }
-    : focusKey.includes('brake') ? { x: 690, y: 271, rx: 66, ry: 66 }
-    : focusKey.includes('suspension') || focusKey.includes('steering') ? { x: 209, y: 257, rx: 104, ry: 82 }
-    : focusKey.includes('wheel') || focusKey.includes('tire') ? { x: 690, y: 271, rx: 78, ry: 78 }
-    : focusKey.includes('transmission') ? { x: 478, y: 250, rx: 82, ry: 58 }
-    : focusKey.includes('driveline') ? { x: 570, y: 269, rx: 118, ry: 48 }
-    : focusKey.includes('fuel') ? { x: 672, y: 220, rx: 105, ry: 52 }
-    : focusKey.includes('exhaust') ? { x: 510, y: 301, rx: 210, ry: 40 }
-    : focusKey.includes('electric') ? { x: 520, y: 135, rx: 112, ry: 78 }
-    : focusKey.includes('under') ? { x: 465, y: 282, rx: 275, ry: 52 }
-    : focusKey.includes('test') || focusKey.includes('drive') ? { x: 470, y: 205, rx: 360, ry: 155 }
-    : { x: 500, y: 140, rx: 310, ry: 112 };
-  return (
-    <svg viewBox="0 0 920 420" role="img" aria-label="Classic vehicle technical cutaway" className="h-full w-full">
-      <defs>
-        <linearGradient id="cutaway-body" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor={color} stopOpacity=".42" />
-          <stop offset="1" stopColor="#d7bd7b" stopOpacity=".16" />
-        </linearGradient>
-        <filter id="cutaway-glow"><feGaussianBlur stdDeviation="4" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
-      </defs>
-      <g opacity=".14" stroke="#f3ead3" strokeWidth="1"><path d="M38 70h844M38 140h844M38 210h844M38 280h844M38 350h844" /><path d="M120 34v350M240 34v350M360 34v350M480 34v350M600 34v350M720 34v350M840 34v350" /></g>
-      <path d="M111 283c11-65 48-104 112-117l95-19 64-91c10-15 27-24 45-24h216c20 0 38 8 51 23l76 90 63 14c34 8 55 30 61 65l5 29h-84c-8-55-43-87-95-87-51 0-87 32-95 87H304c-8-55-43-87-95-87-52 0-87 32-95 87H75l7-23c5-16 15-29 29-37Z" fill="url(#cutaway-body)" stroke="#efe6cf" strokeWidth="4" strokeLinejoin="round" />
-      <path d="M323 146h430M431 38l-61 108M625 38l78 108M505 38v108M257 155l32 93h404l42-93M116 247h47M756 247h92" fill="none" stroke="#efe6cf" strokeWidth="3" opacity=".78" />
-      <path d="M183 263h561" stroke="#c5aa69" strokeWidth="8" strokeLinecap="round" opacity=".8" />
-      <path d="M275 259l26-51M648 259l-26-51M303 259h318" stroke="#d9c996" strokeWidth="4" strokeLinecap="round" />
-      <circle cx="209" cy="271" r="66" fill="#171b17" stroke="#efe6cf" strokeWidth="5" /><circle cx="209" cy="271" r="39" fill="none" stroke="#c5aa69" strokeWidth="8" /><circle cx="209" cy="271" r="11" fill="#c5aa69" />
-      <circle cx="690" cy="271" r="66" fill="#171b17" stroke="#efe6cf" strokeWidth="5" /><circle cx="690" cy="271" r="39" fill="none" stroke="#c5aa69" strokeWidth="8" /><circle cx="690" cy="271" r="11" fill="#c5aa69" />
-      <g filter="url(#cutaway-glow)">
-        <path d="M296 187h92l28 24-22 49H286l-18-39Z" fill="#b98b45" fillOpacity=".46" stroke="#e8c56d" strokeWidth="3" />
-        <path d="M308 176v-22h55v22M288 218h-25M416 218h29" stroke="#e8c56d" strokeWidth="4" />
-        <rect x="240" y="187" width="18" height="72" rx="7" fill="#6ea6ad" stroke="#9fd0d5" strokeWidth="2" />
-        <path d="M414 236h76l52 28h81" fill="none" stroke="#d3b56d" strokeWidth="8" strokeLinecap="round" />
-        <path d="M480 262l22-19 27 19-27 19Z" fill="#d3b56d" fillOpacity=".5" stroke="#ead38f" strokeWidth="2" />
-        <path d="M307 281c58 29 169 35 263 22 50-7 83-19 104-34" fill="none" stroke="#c58e59" strokeWidth="5" strokeDasharray="8 6" />
-        <path d="M458 95v103M541 95v103M458 112c24-21 59-21 83 0" fill="none" stroke="#79b99a" strokeWidth="3" strokeDasharray="6 5" />
-      </g>
-      <g fontFamily="sans-serif" fontSize="15" fontWeight="700" letterSpacing="1.2" fill="#f7f2e7">
-        <path d="M317 185 242 107H90" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="317" cy="185" r="5" fill="#d3b56d" /><text x="90" y="98">ENGINE + COOLING</text>
-        <path d="M207 226 155 156H57" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="207" cy="226" r="5" fill="#d3b56d" /><text x="57" y="147">BRAKES + SUSPENSION</text>
-        <path d="M502 257 580 107H832" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="502" cy="257" r="5" fill="#d3b56d" /><text x="649" y="98">TRANSMISSION + DRIVELINE</text>
-        <path d="M670 301 756 345H866" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="670" cy="301" r="5" fill="#d3b56d" /><text x="706" y="370">FUEL + EXHAUST</text>
-        <path d="M540 118 614 62H832" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="540" cy="118" r="5" fill="#d3b56d" /><text x="678" y="53">BODY + ELECTRICAL</text>
-      </g>
-      {focus && <g>
-        <ellipse cx={focusZone.x} cy={focusZone.y} rx={focusZone.rx} ry={focusZone.ry} fill={color} fillOpacity=".14" stroke={color} strokeWidth="4" strokeDasharray="11 7" filter="url(#cutaway-glow)" />
-        <circle cx={focusZone.x} cy={focusZone.y} r="8" fill={color} stroke="#fff8e7" strokeWidth="3" />
-        <path d={`M${focusZone.x} ${focusZone.y - focusZone.ry} V22 H90`} fill="none" stroke={color} strokeWidth="2.5" />
-        <text x="90" y="16" fill="#fff8e7" fontFamily="sans-serif" fontSize="18" fontWeight="800" letterSpacing="2">{focus.toUpperCase()}</text>
-      </g>}
-    </svg>
-  );
+function focusZoneForSystem(name: string) {
+  const key = name.toLowerCase();
+  if (key.includes('engine')) return { left: '20%', top: '29%', width: '31%', height: '34%' };
+  if (key.includes('cool')) return { left: '6%', top: '27%', width: '25%', height: '39%' };
+  if (key.includes('brake')) return { left: '23%', top: '59%', width: '21%', height: '29%' };
+  if (key.includes('suspension') || key.includes('steering')) return { left: '16%', top: '57%', width: '37%', height: '34%' };
+  if (key.includes('wheel') || key.includes('tire')) return { left: '77%', top: '49%', width: '21%', height: '36%' };
+  if (key.includes('transmission')) return { left: '43%', top: '48%', width: '22%', height: '25%' };
+  if (key.includes('driveline')) return { left: '53%', top: '55%', width: '35%', height: '22%' };
+  if (key.includes('fuel')) return { left: '68%', top: '30%', width: '27%', height: '31%' };
+  if (key.includes('exhaust')) return { left: '48%', top: '53%', width: '42%', height: '22%' };
+  if (key.includes('electric')) return { left: '25%', top: '23%', width: '66%', height: '39%' };
+  if (key.includes('under')) return { left: '17%', top: '52%', width: '72%', height: '32%' };
+  if (key.includes('test') || key.includes('drive')) return { left: '4%', top: '9%', width: '92%', height: '78%' };
+  return { left: '18%', top: '12%', width: '76%', height: '52%' };
+}
+
+function PremiumCutawayArtwork({ focus, accent = '#b7954f' }: { focus?: string; accent?: string }) {
+  const zone = focus ? focusZoneForSystem(focus) : null;
+  return <div className="relative h-full w-full overflow-hidden rounded-2xl bg-[#f4f0e5]">
+    <img src="/k5-premium-cutaway.webp" alt="Detailed classic Chevrolet K5 Blazer mechanical cutaway" className="h-full w-full object-contain" />
+    {focus && zone && <>
+      <div className="absolute rounded-[45%] border-2 shadow-[0_0_0_999px_rgba(26,31,26,.28)]" style={{ ...zone, borderColor: accent, boxShadow: `0 0 0 999px rgba(26,31,26,.28), 0 0 28px ${accent}66` }} />
+      <span className="absolute left-4 top-4 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[.17em] text-white shadow-lg" style={{ backgroundColor: accent }}>{focus}</span>
+    </>}
+  </div>;
 }
 
 function SystemIllustration({ name, status }: { name: string; status: ReportSystemStatus }) {
-  const accent = SYSTEM_ACCENT[status];
-  return <CutawayVehicleDiagram color={accent} focus={name} />;
+  return <PremiumCutawayArtwork focus={name} accent={SYSTEM_ACCENT[status]} />;
 }
 
 export function PremiumInspectionReport({
@@ -190,8 +160,8 @@ export function PremiumInspectionReport({
           {heroPhoto && <img src={heroPhoto} alt={vehicleName} className="absolute inset-0 h-full w-full object-cover opacity-20" />}
           <div className="absolute inset-0 bg-gradient-to-b from-[#11150f]/75 via-[#20251f]/72 to-[#171b16]" />
           <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#171b16] via-[#171b16]/85 to-transparent" />
-          <div className={`pointer-events-none absolute left-1/2 top-20 h-48 w-[82%] max-w-2xl -translate-x-1/2 ${heroPhoto ? 'opacity-45' : 'opacity-90'}`}>
-            <CutawayVehicleDiagram color={vehicleColor} />
+          <div className="pointer-events-none absolute left-1/2 top-20 h-60 w-[82%] max-w-3xl -translate-x-1/2 overflow-hidden rounded-2xl border border-[#d3b56d]/40 bg-[#f4f0e5] shadow-2xl">
+            <PremiumCutawayArtwork accent={vehicleColor} />
           </div>
           <div className="relative z-10 flex min-h-[520px] flex-col px-6 py-7 sm:px-10 sm:py-9">
             <div className="flex items-start justify-between gap-4 border-b border-white/20 pb-5">
@@ -277,7 +247,7 @@ export function PremiumInspectionReport({
                   <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-red-500" />Attention</span>
                 </div>
               </div>
-              <div className="min-h-[290px] py-3"><CutawayVehicleDiagram color={vehicleColor} /></div>
+              <div className="min-h-[290px] p-4"><PremiumCutawayArtwork accent={vehicleColor} /></div>
             </div>
             <div className="grid grid-cols-5 border-t border-white/10 bg-black/15 px-5 py-4 text-center text-[8px] font-bold uppercase tracking-widest text-[#d3b56d] sm:text-[9px]">
               <span>Structure</span><span>Power</span><span>Control</span><span>Safety</span><span>Road</span>
