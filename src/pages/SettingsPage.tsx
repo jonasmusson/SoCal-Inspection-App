@@ -5,6 +5,7 @@ import { UserProfile, UserRole, EmailTemplate, ShopSetting } from '../types';
 import {
   Users, Clock, CheckCircle, Mail, ChevronDown, Save, Store, Wrench,
 } from 'lucide-react';
+import { withTimeout } from '../lib/async';
 
 type Tab = 'pending' | 'team' | 'email' | 'shop';
 
@@ -17,6 +18,7 @@ export function SettingsPage() {
   const [activeUsers, setActiveUsers] = useState<UserProfile[]>([]);
   const [emailTemplate, setEmailTemplate] = useState<EmailTemplate | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [pendingRoles, setPendingRoles] = useState<Record<string, UserRole>>({});
   const [savingEmail, setSavingEmail] = useState(false);
@@ -36,12 +38,14 @@ export function SettingsPage() {
 
   async function loadAll() {
     setLoading(true);
-    const [pendingRes, activeRes, templateRes, shopRes] = await Promise.all([
+    setLoadError(false);
+    try {
+    const [pendingRes, activeRes, templateRes, shopRes] = await withTimeout(Promise.all([
       supabase.from('user_profiles').select('*').eq('status', 'pending').order('created_at'),
       supabase.from('user_profiles').select('*').eq('status', 'active').order('full_name'),
       isOwner ? supabase.from('email_templates').select('*').eq('type', 'welcome_new_user').single() : Promise.resolve({ data: null }),
       isOwner ? supabase.from('shop_settings').select('*') : Promise.resolve({ data: null }),
-    ]);
+    ]));
     setPendingUsers(pendingRes.data || []);
     setActiveUsers(activeRes.data || []);
     if (templateRes.data) {
@@ -57,7 +61,11 @@ export function SettingsPage() {
     const roles: Record<string, UserRole> = {};
     (pendingRes.data || []).forEach((u: UserProfile) => { roles[u.id] = 'tech'; });
     setPendingRoles(roles);
-    setLoading(false);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function approveUser(user: UserProfile) {
@@ -101,7 +109,7 @@ export function SettingsPage() {
 
   async function saveShopSettings() {
     setSavingShop(true);
-    const keys = ['shop_name', 'app_url', 'checkin_required_photos', 'checkin_video_required'];
+    const keys = ['shop_name', 'app_url', 'labor_rate', 'checkin_required_photos', 'checkin_video_required'];
     await Promise.all(keys.map(key =>
       supabase.from('shop_settings').upsert({ key, value: shopSettings[key] ?? '' }, { onConflict: 'key' })
     ));
@@ -152,6 +160,8 @@ export function SettingsPage() {
 
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading...</div>
+      ) : loadError ? (
+        <div className="text-center py-12"><p className="text-gray-600 mb-3">Settings could not be loaded.</p><button onClick={loadAll} className="px-4 py-2 rounded-xl bg-primary-600 text-white font-medium">Try Again</button></div>
       ) : (
         <>
           {/* ── Pending Approvals ── */}
@@ -354,6 +364,19 @@ export function SettingsPage() {
                       value={shopSettings['checkin_required_photos'] ?? '3'}
                       onChange={e => setShopSettings(prev => ({ ...prev, checkin_required_photos: e.target.value }))}
                       className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Shop Labor Rate</label>
+                    <p className="text-xs text-gray-500 mb-1.5">Used only to calculate preliminary planning ranges in the customer report.</p>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-sm text-gray-500">$</span>
+                      <input type="number" min={1} step={1}
+                        value={shopSettings['labor_rate'] ?? '175'}
+                        onChange={e => setShopSettings(prev => ({ ...prev, labor_rate: e.target.value }))}
+                        className="w-full rounded-xl border border-gray-300 py-2.5 pl-7 pr-16 text-sm outline-none focus:ring-2 focus:ring-primary-500" />
+                      <span className="absolute right-3 top-2.5 text-xs text-gray-400">/ hour</span>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between py-1">
