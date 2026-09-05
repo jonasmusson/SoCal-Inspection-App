@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Inspection, InspectionSection, InspectionItem, InspectionPhoto, CheckinPhoto, ItemCondition, PriorityLevel } from '../types';
 import { VEHICLE_COLORS } from '../data/vehicleColors';
-import { ArrowLeft, Check, AlertTriangle, Eye, Send, Eye as Preview, ClipboardList, MinusCircle, Printer, Save } from 'lucide-react';
+import { ArrowLeft, Check, AlertTriangle, Eye, Send, Eye as Preview, ClipboardList, MinusCircle, Printer, Save, Link as LinkIcon } from 'lucide-react';
 import { withTimeout } from '../lib/async';
 import { PremiumInspectionReport } from '../components/report/PremiumInspectionReport';
 
@@ -197,6 +197,20 @@ export function ReviewInspectionPage() {
     }).eq('id', inspection.id);
     setSaving(false);
     navigate(`/inspection/${inspection.id}`);
+  }
+
+  async function copyCustomerReportLink() {
+    if (!inspection?.report_access_token) {
+      setFeedback({ type: 'error', message: 'Publish the customer-report database migration before copying a report link.' });
+      return;
+    }
+    const reportUrl = `${window.location.origin}/report/${inspection.report_access_token}`;
+    try {
+      await navigator.clipboard.writeText(reportUrl);
+      setFeedback({ type: 'success', message: 'Private customer report link copied.' });
+    } catch {
+      setFeedback({ type: 'error', message: `Copy this customer report link: ${reportUrl}` });
+    }
   }
 
   if (loading) return <div className="p-4 text-center text-gray-500">Loading...</div>;
@@ -418,6 +432,12 @@ export function ReviewInspectionPage() {
           {!overall ? 'Select an overall assessment' : !executiveSummary.trim() ? 'Add the Executive Summary' : needsAttention.length > 0 && !primaryRecommendation.trim() ? 'Add the Recommended Next Step' : 'Set a priority for every item requiring attention'}
         </p>}
         <div className="flex gap-3 max-w-3xl mx-auto">
+          {(inspection.report_approved || inspection.status === 'approved' || inspection.status === 'sent') && (
+            <button onClick={copyCustomerReportLink} disabled={saving}
+              className="flex-1 py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              <LinkIcon className="w-5 h-5" /> <span className="hidden sm:inline">Copy Report Link</span><span className="sm:hidden">Copy Link</span>
+            </button>
+          )}
           <button onClick={saveDraft} disabled={saving}
             className="flex-1 py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50">
             <Save className="w-5 h-5" /> {saving ? 'Saving...' : 'Save Draft'}

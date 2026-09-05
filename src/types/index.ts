@@ -69,6 +69,7 @@ export interface Inspection {
   report_approved: boolean;
   report_sent: boolean;
   report_sent_at: string | null;
+  report_access_token?: string;
   checkin_notes: string | null;
   checkin_video_url: string | null;
   checkin_complete: boolean;

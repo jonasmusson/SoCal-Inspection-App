@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { LoadingScreen } from './components/LoadingScreen';
 import { LoginPage, SignupPage } from './components/Auth/LoginPage';
@@ -14,6 +14,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { TemplateEditorPage } from './pages/TemplateEditorPage';
 import { CheckInPage } from './pages/CheckInPage';
+import { PublicReportPage } from './pages/PublicReportPage';
 import { supabase, supabaseConfigured } from './lib/supabase';
 import { Clock, LogOut } from 'lucide-react';
 
@@ -82,22 +83,14 @@ function PendingApprovalScreen() {
   );
 }
 
-function ManagerRoute({ children }: { children: React.ReactNode }) {
-  const { isManager, isOwner } = useAuth();
-  if (!isManager && !isOwner) return <Navigate to="/my-inspections" replace />;
-  return <>{children}</>;
-}
-
-function OwnerRoute({ children }: { children: React.ReactNode }) {
-  const { isOwner, profile } = useAuth();
-  const defaultRoute = profile?.role === 'tech' ? '/my-inspections' : '/dashboard';
-  if (!isOwner) return <Navigate to={defaultRoute} replace />;
-  return <>{children}</>;
-}
-
 function AppRoutes() {
-  const { user, profile, loading, profileError, isPending, isPasswordRecovery, clearPasswordRecovery } = useAuth();
+  const { user, profile, loading, profileError, isManager, isOwner, isPending, isPasswordRecovery, clearPasswordRecovery } = useAuth();
+  const location = useLocation();
   const [showSignup, setShowSignup] = useState(false);
+
+  if (location.pathname.startsWith('/report/')) {
+    return <Routes><Route path="/report/:token" element={<PublicReportPage />} /></Routes>;
+  }
 
   if (loading) return <LoadingScreen />;
 
@@ -125,16 +118,16 @@ function AppRoutes() {
     <Layout>
       <Routes>
         <Route path="/" element={<Navigate to={defaultRoute} replace />} />
-        <Route path="/dashboard" element={<ManagerRoute><DashboardPage /></ManagerRoute>} />
+        <Route path="/dashboard" element={isManager || isOwner ? <DashboardPage /> : <Navigate to="/my-inspections" replace />} />
         <Route path="/my-inspections" element={<MyInspectionsPage />} />
-        <Route path="/checkin" element={<ManagerRoute><CheckInPage /></ManagerRoute>} />
+        <Route path="/checkin" element={isManager || isOwner ? <CheckInPage /> : <Navigate to="/my-inspections" replace />} />
         <Route path="/inspection/:id" element={<InspectionDetailPage />} />
         <Route path="/inspect/:id" element={<InspectRedirect />} />
         <Route path="/inspect/:id/:sectionNumber" element={<InspectSectionPage />} />
-        <Route path="/review/:id" element={<ManagerRoute><ReviewInspectionPage /></ManagerRoute>} />
-        <Route path="/settings" element={<ManagerRoute><SettingsPage /></ManagerRoute>} />
-        <Route path="/templates" element={<OwnerRoute><TemplatesPage /></OwnerRoute>} />
-        <Route path="/templates/:id" element={<OwnerRoute><TemplateEditorPage /></OwnerRoute>} />
+        <Route path="/review/:id" element={isManager || isOwner ? <ReviewInspectionPage /> : <Navigate to="/my-inspections" replace />} />
+        <Route path="/settings" element={isManager || isOwner ? <SettingsPage /> : <Navigate to="/my-inspections" replace />} />
+        <Route path="/templates" element={isOwner ? <TemplatesPage /> : <Navigate to={defaultRoute} replace />} />
+        <Route path="/templates/:id" element={isOwner ? <TemplateEditorPage /> : <Navigate to={defaultRoute} replace />} />
         <Route path="*" element={<Navigate to={defaultRoute} replace />} />
       </Routes>
     </Layout>

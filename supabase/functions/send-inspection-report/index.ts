@@ -35,6 +35,7 @@ Deno.serve(async (req: Request) => {
     const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const resendKey   = Deno.env.get("RESEND_API_KEY");
     const fromEmail   = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
+    const appUrl      = (Deno.env.get("APP_URL") || "https://jonasmusson-socal-in-8zvz.bolt.host").replace(/\/$/, "");
     const usingTestSender = fromEmail === "onboarding@resend.dev";
 
     const hdrs = { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey, "Content-Type": "application/json" };
@@ -63,6 +64,10 @@ Deno.serve(async (req: Request) => {
     const inspRes = await fetch(`${supabaseUrl}/rest/v1/inspections?id=eq.${inspectionId}&select=*`, { headers: hdrs });
     const [insp] = await inspRes.json();
     if (!insp) return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!insp.report_approved || !insp.report_access_token) {
+      return new Response(JSON.stringify({ error: "The report must be approved before it can be delivered" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const reportUrl = `${appUrl}/report/${insp.report_access_token}`;
 
     // Fetch sections
     const secRes = await fetch(`${supabaseUrl}/rest/v1/inspection_sections?inspection_id=eq.${inspectionId}&order=section_number`, { headers: hdrs });
@@ -199,6 +204,10 @@ Deno.serve(async (req: Request) => {
       <p style="margin:0 0 24px;font-size:14px;color:#6b7280;line-height:1.6">
         This report turns several hours of hands-on inspection into a clear visual record of what we observed, why it matters and the next steps we recommend.
       </p>
+      <div style="margin:0 0 28px;text-align:center">
+        <a href="${esc(reportUrl)}" style="display:inline-block;background:#20251f;color:#fff;text-decoration:none;border-radius:999px;padding:14px 24px;font-size:13px;font-weight:800;letter-spacing:.04em">View Your Complete Inspection Report</a>
+        <p style="margin:10px 0 0;font-size:10px;color:#9ca3af">Your private report link opens without an app login.</p>
+      </div>
       <table width="100%" cellspacing="6" style="margin-bottom:22px;text-align:center"><tr>${[["Good",good.length,"#dcfce7"],["Monitor",monitor.length,"#fef3c7"],["Attention",needsAttention.length,"#fee2e2"],["Not inspected",notInspected.length,"#f3f4f6"]].map(([l,n,b])=>`<td style="width:25%;background:${b};border-radius:9px;padding:10px 4px"><strong style="display:block;font-size:20px">${n}</strong><span style="font-size:9px;text-transform:uppercase">${l}</span></td>`).join("")}</tr></table>
       ${insp.executive_summary?`<div style="border-left:4px solid #b7954f;background:#fafaf9;padding:16px 18px;margin-bottom:18px"><b style="font-size:10px;text-transform:uppercase;color:#78716c">Executive Summary</b><p style="font-size:14px;line-height:1.65;color:#374151">${esc(insp.executive_summary)}</p></div>`:""}${insp.primary_recommendation?`<div style="background:#2f372d;color:#fff;border-radius:12px;padding:16px 18px;margin-bottom:22px"><b style="color:#d3b56d;font-size:10px;text-transform:uppercase">Recommended next step</b><p style="font-size:14px;line-height:1.6">${esc(insp.primary_recommendation)}</p></div>`:""}
       ${rangedItems.length ? `<div style="background:#fafaf9;border:1px solid #e7e5e4;border-radius:12px;padding:16px 18px;margin-bottom:22px"><b style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#78716c">Preliminary Repair Planning</b><table width="100%" style="margin-top:10px"><tr><td><span style="font-size:11px;color:#78716c">Labor allowance</span><strong style="display:block;font-size:15px;color:#292524">${totalLaborLow}–${totalLaborHigh} hours</strong></td><td><span style="font-size:11px;color:#78716c">Parts allowance</span><strong style="display:block;font-size:15px;color:#292524">${usd(totalPartsLow)}–${usd(totalPartsHigh)}</strong></td></tr></table><p style="margin:10px 0 0;font-size:10px;color:#78716c">Planning figures only—not a repair authorization or fixed estimate.</p></div>` : ""}

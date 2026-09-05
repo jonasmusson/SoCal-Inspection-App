@@ -164,7 +164,7 @@ export function PremiumInspectionReport({
 
         <section data-report-card className="px-7 py-12 text-white sm:px-12 sm:py-16" style={{ backgroundColor: INK }}>
           <p className="text-[9px] font-black uppercase tracking-[.26em] text-[#d1ad67]">02 · System Condition</p>
-          <div className="mt-4 grid gap-6 lg:grid-cols-[.68fr_.32fr]"><h2 className="text-4xl font-black leading-[.96] tracking-[-.04em] sm:text-5xl">Thirteen systems.<br />One complete-car view.</h2><p className="text-sm leading-7 text-white/60">Each system is summarized in the same order your technician followed through the vehicle. The color is a signal; the written finding is the evidence.</p></div>
+          <div className="mt-4 grid gap-6 lg:grid-cols-[.68fr_.32fr]"><h2 className="text-4xl font-black leading-[.96] tracking-[-.04em] sm:text-5xl">{sections.length} systems.<br />One complete-car view.</h2><p className="text-sm leading-7 text-white/60">Each system is summarized in the same order your technician followed through the vehicle. The color is a signal; the written finding is the evidence.</p></div>
           {illustration && <div className="mt-7 h-[260px] overflow-hidden bg-[#f2ede1] sm:h-[340px]"><img src={illustration.src} alt={illustration.alt} className="h-full w-full object-contain" /></div>}
           <div className="mt-7 grid border-l border-t border-white/15 sm:grid-cols-2 lg:grid-cols-3">
             {systemRows.map((row, index) => {
