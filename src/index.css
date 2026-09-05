@@ -69,7 +69,7 @@ input[type=number] {
 @media print {
   @page {
     size: letter portrait;
-    margin: 0.45in;
+    margin: 0.3in;
   }
 
   body {
@@ -88,8 +88,7 @@ input[type=number] {
   }
 
   .printable-report {
-    position: absolute !important;
-    inset: 0 auto auto 0 !important;
+    position: static !important;
     width: 100% !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -101,9 +100,20 @@ input[type=number] {
   }
 
   .printable-report [data-report-cover] {
-    min-height: 10in !important;
+    min-height: 10.4in !important;
     break-after: page;
     page-break-after: always;
+  }
+
+  .printable-report [data-report-system] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .printable-report h2,
+  .printable-report h3 {
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   .printable-report img {
