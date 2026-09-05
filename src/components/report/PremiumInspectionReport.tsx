@@ -23,6 +23,7 @@ interface PremiumInspectionReportProps {
   executiveSummary: string;
   primaryRecommendation: string;
   colorMeta?: { hex: string };
+  laborRate?: number;
 }
 
 const PRIORITY_META: Record<PriorityLevel, { label: string; eyebrow: string; className: string; dot: string }> = {
@@ -118,6 +119,7 @@ export function PremiumInspectionReport({
   inspection, sections, needsAttention, monitor, good, notInspected, photos,
   checkinPhotos, priorities, overall, guidance, managerNotes, executiveSummary,
   primaryRecommendation, colorMeta,
+  laborRate = 175,
 }: PremiumInspectionReportProps) {
   const inspectedCount = good.length + monitor.length + needsAttention.length;
   const totalCount = inspectedCount + notInspected.length;
@@ -130,6 +132,10 @@ export function PremiumInspectionReport({
   const totalLaborHigh = rangedItems.reduce((sum, item) => sum + (item.labor_hours_high ?? item.labor_hours_low ?? 0), 0);
   const totalPartsLow = rangedItems.reduce((sum, item) => sum + (item.parts_cost_low ?? 0), 0);
   const totalPartsHigh = rangedItems.reduce((sum, item) => sum + (item.parts_cost_high ?? item.parts_cost_low ?? 0), 0);
+  const totalLaborCostLow = totalLaborLow * laborRate;
+  const totalLaborCostHigh = totalLaborHigh * laborRate;
+  const planningTotalLow = totalLaborCostLow + totalPartsLow;
+  const planningTotalHigh = totalLaborCostHigh + totalPartsHigh;
   const vehicleName = `${inspection.vehicle_year} ${inspection.vehicle_make} ${inspection.vehicle_model}`;
   const reportDate = new Date(inspection.completed_at || inspection.updated_at || inspection.created_at)
     .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -289,7 +295,7 @@ export function PremiumInspectionReport({
                 const accent = SYSTEM_ACCENT[status as ReportSystemStatus];
                 const statusLabel = status === 'attention' ? 'Needs attention' : status === 'monitor' ? 'Monitor' : status === 'good' ? 'All good' : 'Not inspected';
                 const relatedPhotos = photos.filter(photo => sectionItems.some(item => item.id === photo.item_id)).slice(0, 3);
-                return <article data-report-card key={section.id} className="overflow-hidden rounded-[26px] border border-stone-200 bg-white shadow-[0_16px_45px_rgba(50,45,35,.08)]">
+                return <article data-report-card data-report-system key={section.id} className="overflow-hidden rounded-[26px] border border-stone-200 bg-white shadow-[0_16px_45px_rgba(50,45,35,.08)]">
                   <div className="grid min-h-[300px] lg:grid-cols-[.44fr_.56fr]">
                     <div className={`relative flex min-h-[270px] items-center justify-center overflow-hidden bg-[#20261f] p-8 ${index % 2 ? 'lg:order-2' : ''}`}>
                       <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.3) 1px, transparent 1px)', backgroundSize: '34px 34px' }} />
@@ -317,13 +323,17 @@ export function PremiumInspectionReport({
             </div>
           </section>
 
-          {rangedItems.length > 0 && <section data-report-card className="rounded-2xl bg-[#e8e1ce] p-6 sm:p-8">
-            <div className="grid gap-6 sm:grid-cols-3">
-              <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#8a6b30]">04 · Planning snapshot</p><h2 className="mt-2 text-2xl font-black text-[#252b24]">A realistic place to start.</h2></div>
-              <div className="flex items-center gap-3 rounded-xl bg-white/70 p-4"><Clock3 className="h-7 w-7 text-[#8a6b30]" /><div><p className="text-[10px] uppercase tracking-widest text-stone-500">Labor allowance</p><p className="text-xl font-black">{totalLaborLow}–{totalLaborHigh} hours</p></div></div>
-              <div className="flex items-center gap-3 rounded-xl bg-white/70 p-4"><Wrench className="h-7 w-7 text-[#8a6b30]" /><div><p className="text-[10px] uppercase tracking-widest text-stone-500">Parts allowance</p><p className="text-xl font-black">{money(totalPartsLow)}–{money(totalPartsHigh)}</p></div></div>
+          {rangedItems.length > 0 && <section data-report-card className="overflow-hidden rounded-[26px] bg-[#e8e1ce]">
+            <div className="grid gap-6 p-6 sm:grid-cols-[.8fr_1.2fr] sm:p-8">
+              <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#8a6b30]">04 · Planning snapshot</p><h2 className="mt-2 text-3xl font-black leading-tight text-[#252b24]">Understand the scale before choosing the sequence.</h2><p className="mt-3 text-xs leading-5 text-stone-600">Built from the technician's preliminary labor and parts allowances.</p></div>
+              <div className="rounded-2xl bg-[#252b24] p-5 text-white shadow-lg"><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#d3b56d]">Preliminary project range</p><p className="mt-2 text-3xl font-black">{money(planningTotalLow)}–{money(planningTotalHigh)}</p><p className="mt-2 text-[10px] leading-4 text-white/50">Planning guidance only · not an estimate or authorization</p></div>
             </div>
-            <p className="mt-4 text-[11px] leading-5 text-stone-600">Planning ranges help sequence the work. Final pricing requires diagnosis, parts availability and an approved repair estimate.</p>
+            <div className="grid border-t border-[#cfc4a8] sm:grid-cols-3">
+              <div className="flex items-center gap-3 border-b border-[#cfc4a8] p-5 sm:border-b-0 sm:border-r"><Clock3 className="h-6 w-6 text-[#8a6b30]" /><div><p className="text-[9px] uppercase tracking-widest text-stone-500">Labor time</p><p className="text-lg font-black">{totalLaborLow}–{totalLaborHigh} hours</p></div></div>
+              <div className="flex items-center gap-3 border-b border-[#cfc4a8] p-5 sm:border-b-0 sm:border-r"><Wrench className="h-6 w-6 text-[#8a6b30]" /><div><p className="text-[9px] uppercase tracking-widest text-stone-500">Labor planning</p><p className="text-lg font-black">{money(totalLaborCostLow)}–{money(totalLaborCostHigh)}</p></div></div>
+              <div className="flex items-center gap-3 p-5"><Wrench className="h-6 w-6 text-[#8a6b30]" /><div><p className="text-[9px] uppercase tracking-widest text-stone-500">Parts planning</p><p className="text-lg font-black">{money(totalPartsLow)}–{money(totalPartsHigh)}</p></div></div>
+            </div>
+            <p className="border-t border-[#cfc4a8] px-6 py-4 text-[10px] leading-5 text-stone-600 sm:px-8">Labor planning uses the current shop rate of {money(laborRate)} per hour. Final pricing may change after disassembly, diagnosis, parts selection and availability. No work is authorized by this report.</p>
           </section>}
 
           {(needsAttention.length > 0 || monitor.length > 0) && <section data-report-card className="overflow-hidden rounded-[28px] border border-[#d8d1bd] bg-white shadow-lg">
@@ -396,6 +406,15 @@ export function PremiumInspectionReport({
           {notInspected.length > 0 && <section data-report-card><h2 className="text-lg font-black text-[#252b24]">Not inspected</h2><div className="mt-3 grid gap-2 sm:grid-cols-2">{notInspected.map(item => <div key={item.id} className="rounded-xl border border-stone-200 bg-stone-100 p-3"><p className="text-sm font-bold">{item.item_name}</p><p className="mt-1 text-xs text-stone-500">{item.not_inspected_reason || 'Reason not provided'}</p></div>)}</div></section>}
 
           {managerNotes && <section data-report-card className="rounded-2xl border-l-4 border-[#b7954f] bg-white p-6 shadow-sm"><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#9b7a38]">A note from our team</p><p className="mt-3 text-sm leading-7 text-stone-700">{managerNotes}</p></section>}
+
+          <section data-report-card className="overflow-hidden rounded-[26px] border border-[#d8d1bd] bg-white shadow-sm">
+            <div className="grid lg:grid-cols-[.72fr_1.28fr]">
+              <div className="bg-[#30382e] p-7 text-white sm:p-9"><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#d3b56d]">The next conversation</p><h2 className="mt-3 text-3xl font-black leading-tight">Turn the inspection into the right plan.</h2><p className="mt-4 text-sm leading-7 text-white/65">Your advisor will walk through the findings, confirm priorities and build a formal estimate around your goals.</p></div>
+              <div className="grid gap-px bg-stone-200 sm:grid-cols-3">
+                {[['01', 'Review', 'Discuss the evidence and answer questions.'], ['02', 'Sequence', 'Choose what happens now, next and later.'], ['03', 'Authorize', 'Approve only the work and budget you select.']].map(([number, title, copy]) => <div key={number} className="bg-[#f7f5ef] p-6"><p className="text-3xl font-black text-[#b7954f]">{number}</p><p className="mt-5 text-sm font-black uppercase tracking-wider text-[#252b24]">{title}</p><p className="mt-2 text-xs leading-5 text-stone-600">{copy}</p></div>)}
+              </div>
+            </div>
+          </section>
         </div>
 
         <footer data-report-card className="bg-[#20251f] px-6 py-10 text-center text-white sm:px-10">
