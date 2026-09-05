@@ -52,7 +52,21 @@ const SYSTEM_ACCENT: Record<ReportSystemStatus, string> = {
   not_inspected: '#8a8b84',
 };
 
-function CutawayVehicleDiagram({ color }: { color: string }) {
+function CutawayVehicleDiagram({ color, focus }: { color: string; focus?: string }) {
+  const focusKey = focus?.toLowerCase() || '';
+  const focusZone = focusKey.includes('engine') ? { x: 338, y: 220, rx: 92, ry: 66 }
+    : focusKey.includes('cool') ? { x: 248, y: 222, rx: 54, ry: 72 }
+    : focusKey.includes('brake') ? { x: 690, y: 271, rx: 66, ry: 66 }
+    : focusKey.includes('suspension') || focusKey.includes('steering') ? { x: 209, y: 257, rx: 104, ry: 82 }
+    : focusKey.includes('wheel') || focusKey.includes('tire') ? { x: 690, y: 271, rx: 78, ry: 78 }
+    : focusKey.includes('transmission') ? { x: 478, y: 250, rx: 82, ry: 58 }
+    : focusKey.includes('driveline') ? { x: 570, y: 269, rx: 118, ry: 48 }
+    : focusKey.includes('fuel') ? { x: 672, y: 220, rx: 105, ry: 52 }
+    : focusKey.includes('exhaust') ? { x: 510, y: 301, rx: 210, ry: 40 }
+    : focusKey.includes('electric') ? { x: 520, y: 135, rx: 112, ry: 78 }
+    : focusKey.includes('under') ? { x: 465, y: 282, rx: 275, ry: 52 }
+    : focusKey.includes('test') || focusKey.includes('drive') ? { x: 470, y: 205, rx: 360, ry: 155 }
+    : { x: 500, y: 140, rx: 310, ry: 112 };
   return (
     <svg viewBox="0 0 920 420" role="img" aria-label="Classic vehicle technical cutaway" className="h-full w-full">
       <defs>
@@ -85,29 +99,19 @@ function CutawayVehicleDiagram({ color }: { color: string }) {
         <path d="M670 301 756 345H866" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="670" cy="301" r="5" fill="#d3b56d" /><text x="706" y="370">FUEL + EXHAUST</text>
         <path d="M540 118 614 62H832" stroke="#d3b56d" strokeWidth="2" fill="none" /><circle cx="540" cy="118" r="5" fill="#d3b56d" /><text x="678" y="53">BODY + ELECTRICAL</text>
       </g>
+      {focus && <g>
+        <ellipse cx={focusZone.x} cy={focusZone.y} rx={focusZone.rx} ry={focusZone.ry} fill={color} fillOpacity=".14" stroke={color} strokeWidth="4" strokeDasharray="11 7" filter="url(#cutaway-glow)" />
+        <circle cx={focusZone.x} cy={focusZone.y} r="8" fill={color} stroke="#fff8e7" strokeWidth="3" />
+        <path d={`M${focusZone.x} ${focusZone.y - focusZone.ry} V22 H90`} fill="none" stroke={color} strokeWidth="2.5" />
+        <text x="90" y="16" fill="#fff8e7" fontFamily="sans-serif" fontSize="18" fontWeight="800" letterSpacing="2">{focus.toUpperCase()}</text>
+      </g>}
     </svg>
   );
 }
 
 function SystemIllustration({ name, status }: { name: string; status: ReportSystemStatus }) {
-  const key = name.toLowerCase();
   const accent = SYSTEM_ACCENT[status];
-  const common = { fill: 'none', stroke: accent, strokeWidth: 4, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-  let art: JSX.Element;
-  if (key.includes('brake')) art = <><circle cx="80" cy="60" r="34" {...common} /><circle cx="80" cy="60" r="10" {...common} /><path d="M104 35h18v50h-18M43 60H20" {...common} /></>;
-  else if (key.includes('suspension') || key.includes('steering')) art = <><path d="M20 36h30l12 48h36l12-48h30M45 24l22 72M115 24 93 96" {...common} /><circle cx="38" cy="91" r="14" {...common} /><circle cx="122" cy="91" r="14" {...common} /></>;
-  else if (key.includes('engine')) art = <><path d="M29 43h18l10-16h45l11 16h17v45H29Z" {...common} /><path d="M47 43v45M66 27V15h25v12M75 54h23M75 69h23" {...common} /></>;
-  else if (key.includes('cool')) art = <><rect x="42" y="18" width="76" height="84" rx="8" {...common} /><path d="M55 31v58M68 31v58M81 31v58M94 31v58M107 31v58M27 42h15M118 79h15" {...common} /></>;
-  else if (key.includes('electric')) art = <><path d="M87 13 48 65h29l-7 42 42-58H82Z" {...common} /><circle cx="28" cy="28" r="11" {...common} /><circle cx="132" cy="92" r="11" {...common} /></>;
-  else if (key.includes('fuel')) art = <><path d="M38 25h63v75H38Z" {...common} /><path d="M101 42h15l12 13v41c0 8 12 8 12 0V53l-12-13M53 41h33" {...common} /></>;
-  else if (key.includes('exhaust')) art = <><path d="M18 36h46c10 0 14 8 14 18v18c0 10 5 16 15 16h48" {...common} /><path d="M104 76h25v24h-25Z" {...common} /></>;
-  else if (key.includes('transmission')) art = <><path d="M38 31h45l24 22v36l-24 15H38L21 78V48Z" {...common} /><path d="M107 70h34M52 49v37M70 49v37" {...common} /></>;
-  else if (key.includes('driveline')) art = <><circle cx="30" cy="60" r="18" {...common} /><circle cx="130" cy="60" r="18" {...common} /><path d="M48 60h64M73 44l28 32M101 44 73 76" {...common} /></>;
-  else if (key.includes('wheel') || key.includes('tire')) art = <><circle cx="80" cy="60" r="45" {...common} /><circle cx="80" cy="60" r="18" {...common} /><path d="M80 42v36M62 60h36M67 47l26 26M93 47 67 73" {...common} /></>;
-  else if (key.includes('under')) art = <><path d="M18 42h124M31 42l17 43h65l16-43M58 85v18M102 85v18" {...common} /><path d="M48 65h65" {...common} /></>;
-  else if (key.includes('test') || key.includes('drive')) art = <><circle cx="80" cy="66" r="40" {...common} /><circle cx="80" cy="66" r="9" {...common} /><path d="M80 57V29M74 72 48 90M86 72l26 18M28 19h104" {...common} /></>;
-  else art = <><path d="M17 77c8-30 25-43 56-49l42-8 28 32v35h-17c-4-20-16-30-35-30S60 67 56 87H18Z" {...common} /><circle cx="91" cy="87" r="18" {...common} /><path d="M40 49h69M73 28 60 49" {...common} /></>;
-  return <svg viewBox="0 0 160 120" role="img" aria-label={`${name} system illustration`} className="h-full w-full">{art}</svg>;
+  return <CutawayVehicleDiagram color={accent} focus={name} />;
 }
 
 export function PremiumInspectionReport({
@@ -142,7 +146,7 @@ export function PremiumInspectionReport({
     const skipped = sectionItems.filter(item => item.status === 'not_inspected').length;
     const status = attention ? 'attention' : watching ? 'monitor' : passed ? 'good' : 'not_inspected';
     const highlightedItems = sectionItems.filter(item => item.status === 'needs_attention' || item.status === 'monitor');
-    return { section, attention, watching, passed, skipped, total: sectionItems.length, status, highlightedItems };
+    return { section, attention, watching, passed, skipped, total: sectionItems.length, status, highlightedItems, sectionItems };
   });
 
   function allowance(item: InspectionItem) {
@@ -157,6 +161,11 @@ export function PremiumInspectionReport({
     { label: 'Attention', value: needsAttention.length, icon: AlertTriangle, tone: 'bg-red-50 text-red-800 border-red-200', bar: 'bg-red-500' },
     { label: 'Not inspected', value: notInspected.length, icon: CircleSlash2, tone: 'bg-stone-100 text-stone-700 border-stone-200', bar: 'bg-stone-400' },
   ];
+  const roadmapGroups = (['immediate', 'short_term', 'long_term', 'upgrade'] as PriorityLevel[]).map(priority => ({
+    priority,
+    meta: PRIORITY_META[priority],
+    items: [...needsAttention, ...monitor].filter(item => (priorities[item.id] || item.priority || 'short_term') === priority),
+  }));
 
   return (
     <div className="rounded-2xl bg-[#dcd8cc] p-2 sm:p-5 shadow-inner">
@@ -172,8 +181,8 @@ export function PremiumInspectionReport({
 
       <article className="printable-report mx-auto max-w-[900px] overflow-hidden rounded-[22px] bg-[#f7f5ef] text-stone-900 shadow-2xl">
         <section data-report-cover className="relative min-h-[520px] overflow-hidden bg-[#20251f] text-white">
-          {heroPhoto && <img src={heroPhoto} alt={vehicleName} className="absolute inset-0 h-full w-full object-cover opacity-45" />}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#11150f]/55 via-[#20251f]/55 to-[#171b16]" />
+          {heroPhoto && <img src={heroPhoto} alt={vehicleName} className="absolute inset-0 h-full w-full object-cover opacity-20" />}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#11150f]/75 via-[#20251f]/72 to-[#171b16]" />
           <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#171b16] via-[#171b16]/85 to-transparent" />
           <div className={`pointer-events-none absolute left-1/2 top-20 h-48 w-[82%] max-w-2xl -translate-x-1/2 ${heroPhoto ? 'opacity-45' : 'opacity-90'}`}>
             <CutawayVehicleDiagram color={vehicleColor} />
@@ -275,25 +284,34 @@ export function PremiumInspectionReport({
               <h2 className="mt-2 text-3xl font-black tracking-tight text-[#252b24]">Follow the inspection from front to back.</h2>
               <p className="mt-3 text-sm leading-7 text-stone-600">Every illustrated chapter matches a section completed in the app, so the findings stay easy to understand and easy to discuss.</p>
             </div>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {sectionRows.map(({ section, attention, watching, passed, skipped, total, status, highlightedItems }, index) => {
+            <div className="mt-7 space-y-6">
+              {sectionRows.map(({ section, attention, watching, passed, skipped, total, status, highlightedItems, sectionItems }, index) => {
                 const accent = SYSTEM_ACCENT[status as ReportSystemStatus];
                 const statusLabel = status === 'attention' ? 'Needs attention' : status === 'monitor' ? 'Monitor' : status === 'good' ? 'All good' : 'Not inspected';
-                return <article data-report-card key={section.id} className="group overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-                  <div className="grid min-h-[210px] grid-cols-[.42fr_.58fr]">
-                    <div className="relative flex items-center justify-center overflow-hidden bg-[#222923] p-4">
-                      <div className="absolute left-3 top-3 text-[9px] font-black uppercase tracking-[.18em] text-white/35">{String(index + 1).padStart(2, '0')}</div>
-                      <div className="h-28 w-full opacity-95"><SystemIllustration name={section.section_name} status={status as ReportSystemStatus} /></div>
-                      <span className="absolute bottom-3 left-3 rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-wider" style={{ color: accent, borderColor: `${accent}66`, backgroundColor: `${accent}18` }}>{statusLabel}</span>
+                const relatedPhotos = photos.filter(photo => sectionItems.some(item => item.id === photo.item_id)).slice(0, 3);
+                return <article data-report-card key={section.id} className="overflow-hidden rounded-[26px] border border-stone-200 bg-white shadow-[0_16px_45px_rgba(50,45,35,.08)]">
+                  <div className="grid min-h-[300px] lg:grid-cols-[.44fr_.56fr]">
+                    <div className={`relative flex min-h-[270px] items-center justify-center overflow-hidden bg-[#20261f] p-8 ${index % 2 ? 'lg:order-2' : ''}`}>
+                      <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.3) 1px, transparent 1px)', backgroundSize: '34px 34px' }} />
+                      <div className="absolute left-5 top-5 flex items-center gap-3"><span className="text-4xl font-black text-white/10">{String(index + 1).padStart(2, '0')}</span><span className="h-px w-12 bg-white/20" /></div>
+                      <div className="relative h-56 w-full max-w-lg opacity-95"><SystemIllustration name={section.section_name} status={status as ReportSystemStatus} /></div>
+                      <span className="absolute bottom-5 left-5 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-[.14em]" style={{ color: accent, borderColor: `${accent}66`, backgroundColor: `${accent}18` }}>{statusLabel}</span>
+                      <span className="absolute bottom-6 right-5 text-[9px] font-bold uppercase tracking-widest text-white/30">SoCal inspection chapter</span>
                     </div>
-                    <div className="flex flex-col p-4 sm:p-5">
-                      <p className="text-[9px] font-bold uppercase tracking-[.18em] text-stone-400">Inspection chapter</p>
-                      <h3 className="mt-1 text-lg font-black leading-tight text-[#252b24]">{section.section_name}</h3>
-                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-stone-100"><div className="h-full rounded-full" style={{ width: `${total ? Math.max(8, Math.round(((passed + watching + attention) / total) * 100)) : 0}%`, backgroundColor: accent }} /></div>
-                      <p className="mt-2 text-[10px] leading-5 text-stone-500">{total} checks · {passed} good{watching ? ` · ${watching} monitor` : ''}{attention ? ` · ${attention} attention` : ''}{skipped ? ` · ${skipped} not inspected` : ''}</p>
-                      {highlightedItems.length > 0 ? <div className="mt-auto pt-3"><p className="text-[9px] font-black uppercase tracking-wider" style={{ color: accent }}>Key finding</p><p className="mt-1 text-xs font-semibold leading-5 text-stone-700">{highlightedItems[0].item_name}</p></div> : <div className="mt-auto flex items-center gap-1.5 pt-3 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />No concerns identified</div>}
+                    <div className={`flex flex-col p-6 sm:p-8 ${index % 2 ? 'lg:order-1' : ''}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div><p className="text-[9px] font-black uppercase tracking-[.22em] text-[#9b7a38]">Chapter {String(index + 1).padStart(2, '0')} · Inspection system</p><h3 className="mt-2 text-3xl font-black leading-none tracking-tight text-[#252b24]">{section.section_name}</h3></div>
+                        <div className="rounded-xl bg-stone-50 px-4 py-3 text-center"><p className="text-2xl font-black" style={{ color: accent }}>{passed}/{total}</p><p className="text-[8px] font-bold uppercase tracking-widest text-stone-400">Checks clear</p></div>
+                      </div>
+                      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-stone-100"><div className="h-full rounded-full" style={{ width: `${total ? Math.max(8, Math.round(((passed + watching + attention) / total) * 100)) : 0}%`, backgroundColor: accent }} /></div>
+                      <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-stone-400">{total} checks completed · {passed} good{watching ? ` · ${watching} monitor` : ''}{attention ? ` · ${attention} attention` : ''}{skipped ? ` · ${skipped} not inspected` : ''}</p>
+
+                      {highlightedItems.length > 0 ? <div className="mt-5 space-y-3">{highlightedItems.slice(0, 3).map(item => <div key={item.id} className="border-l-2 pl-4" style={{ borderColor: accent }}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-black text-stone-800">{item.item_name}</p><span className="text-[8px] font-black uppercase tracking-wider" style={{ color: accent }}>{item.status === 'needs_attention' ? 'Needs attention' : 'Monitor'}</span></div>{item.notes && <p className="mt-1 text-xs leading-5 text-stone-600">{item.notes}</p>}{item.recommended_action && <p className="mt-1 text-[10px] font-semibold leading-4 text-stone-500"><span className="uppercase tracking-wider text-[#8a6b30]">Next step:</span> {item.recommended_action}</p>}</div>)}</div> : <div className="mt-5 rounded-xl bg-emerald-50 p-4"><div className="flex items-center gap-2 text-sm font-black text-emerald-800"><CheckCircle2 className="h-4 w-4" />No concerns identified</div><p className="mt-1 text-xs leading-5 text-emerald-900/65">All inspected points in this system performed or presented satisfactorily at the time of inspection.</p></div>}
+
+                      <div className="mt-auto pt-5"><p className="text-[8px] font-black uppercase tracking-[.18em] text-stone-400">Inspection coverage</p><p className="mt-1 text-[10px] leading-5 text-stone-500">{sectionItems.slice(0, 6).map(item => item.item_name).join(' · ')}{sectionItems.length > 6 ? ` · +${sectionItems.length - 6} more` : ''}</p></div>
                     </div>
                   </div>
+                  {relatedPhotos.length > 0 && <div className="grid grid-cols-3 gap-1 border-t border-white bg-stone-100 p-1">{relatedPhotos.map(photo => <img key={photo.id} src={photo.photo_url} alt={`${section.section_name} evidence`} className="h-36 w-full object-cover" />)}</div>}
                 </article>;
               })}
             </div>
@@ -308,8 +326,30 @@ export function PremiumInspectionReport({
             <p className="mt-4 text-[11px] leading-5 text-stone-600">Planning ranges help sequence the work. Final pricing requires diagnosis, parts availability and an approved repair estimate.</p>
           </section>}
 
+          {(needsAttention.length > 0 || monitor.length > 0) && <section data-report-card className="overflow-hidden rounded-[28px] border border-[#d8d1bd] bg-white shadow-lg">
+            <div className="grid bg-[#252b24] text-white lg:grid-cols-[.72fr_1.28fr]">
+              <div className="p-7 sm:p-9">
+                <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#d3b56d]">05 · Your repair roadmap</p>
+                <h2 className="mt-3 text-3xl font-black leading-tight">A clear plan turns a large project into confident decisions.</h2>
+                <p className="mt-4 text-sm leading-7 text-white/65">The goal is not to approve everything at once. It is to understand what protects the vehicle now, what should follow, and what can wait.</p>
+              </div>
+              <div className="grid grid-cols-2 border-l border-white/10">
+                {roadmapGroups.map(({ priority, meta, items }) => <div key={priority} className="border-b border-r border-white/10 p-5 sm:p-6">
+                  <div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${meta.dot}`} /><p className="text-[9px] font-black uppercase tracking-[.18em] text-white/55">{meta.eyebrow}</p></div>
+                  <p className="mt-2 text-xl font-black">{items.length}</p><p className="text-xs font-bold text-white/85">{meta.label}</p>
+                  <p className="mt-2 text-[10px] leading-4 text-white/45">{items.length ? items.slice(0, 2).map(item => item.item_name).join(' · ') : 'No items in this phase'}</p>
+                </div>)}
+              </div>
+            </div>
+            <div className="grid gap-4 bg-[#f2eee3] p-6 sm:grid-cols-3 sm:p-8">
+              <div><p className="text-[9px] font-black uppercase tracking-[.18em] text-[#8a6b30]">First decision</p><p className="mt-2 text-sm font-bold leading-6 text-stone-800">Begin with safety, reliability, and anything that could create additional damage.</p></div>
+              <div><p className="text-[9px] font-black uppercase tracking-[.18em] text-[#8a6b30]">Then protect value</p><p className="mt-2 text-sm font-bold leading-6 text-stone-800">Sequence corrective work so repairs are not duplicated or undone later.</p></div>
+              <div><p className="text-[9px] font-black uppercase tracking-[.18em] text-[#8a6b30]">Build with purpose</p><p className="mt-2 text-sm font-bold leading-6 text-stone-800">Plan upgrades around how you want to drive, use, and enjoy the vehicle.</p></div>
+            </div>
+          </section>}
+
           {needsAttention.length > 0 && <section>
-            <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#9b7a38]">05 · Findings</p>
+            <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#9b7a38]">06 · Findings</p>
             <h2 className="mt-2 text-2xl font-black text-[#252b24]">What needs attention—and why.</h2>
             <div className="mt-5 space-y-5">
               {needsAttention.map((item, index) => {
@@ -340,7 +380,7 @@ export function PremiumInspectionReport({
           </section>}
 
           {monitor.length > 0 && <section data-report-card>
-            <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#9b7a38]">06 · Watch list</p>
+            <p className="text-[10px] font-black uppercase tracking-[.24em] text-[#9b7a38]">07 · Watch list</p>
             <h2 className="mt-2 text-2xl font-black text-[#252b24]">Not urgent. Not forgotten.</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">{monitor.map(item => {
               const section = sections.find(s => s.id === item.section_id);
