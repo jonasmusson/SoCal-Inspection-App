@@ -34,7 +34,35 @@ const K5_FOCUS_ZONES: Record<string, IllustrationFocusZone> = {
   test_drive: { left: '4%', top: '9%', width: '92%', height: '78%' },
 };
 
+const MUSTANG_FOCUS_ZONES: Record<string, IllustrationFocusZone> = {
+  engine: { left: '17%', top: '35%', width: '30%', height: '29%' },
+  cooling: { left: '4%', top: '38%', width: '24%', height: '31%' },
+  brakes: { left: '34%', top: '61%', width: '20%', height: '27%' },
+  suspension: { left: '28%', top: '55%', width: '29%', height: '34%' },
+  wheels: { left: '75%', top: '48%', width: '20%', height: '30%' },
+  transmission: { left: '42%', top: '48%', width: '23%', height: '24%' },
+  driveline: { left: '51%', top: '51%', width: '35%', height: '22%' },
+  fuel: { left: '76%', top: '34%', width: '20%', height: '28%' },
+  exhaust: { left: '42%', top: '57%', width: '43%', height: '18%' },
+  electrical: { left: '23%', top: '27%', width: '60%', height: '35%' },
+  undercarriage: { left: '26%', top: '53%', width: '62%', height: '27%' },
+  body: { left: '30%', top: '16%', width: '65%', height: '49%' },
+  test_drive: { left: '3%', top: '12%', width: '93%', height: '72%' },
+};
+
 export const REPORT_VEHICLE_ILLUSTRATIONS: ReportVehicleIllustration[] = [
+  {
+    id: 'ford-mustang-1967-1970',
+    title: '1967–1970 Ford Mustang',
+    yearStart: 1967,
+    yearEnd: 1970,
+    makes: ['ford'],
+    models: ['mustang', 'fastback'],
+    bodyStyle: 'coupe',
+    src: '/mustang-premium-cutaway.webp',
+    alt: 'Detailed technical cutaway illustration of a classic Ford Mustang',
+    focusZones: MUSTANG_FOCUS_ZONES,
+  },
   {
     id: 'gm-k5-1969-1972',
     title: '1969–1972 Chevrolet K5 Blazer / GMC Jimmy',

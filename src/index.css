@@ -95,8 +95,8 @@ input[type=number] {
   }
 
   .printable-report [data-report-card] {
-    break-inside: avoid;
-    page-break-inside: avoid;
+    break-inside: auto;
+    page-break-inside: auto;
   }
 
   .printable-report [data-report-cover] {
@@ -105,7 +105,8 @@ input[type=number] {
     page-break-after: always;
   }
 
-  .printable-report [data-report-system] {
+  .printable-report [data-report-system],
+  .printable-report [data-report-finding] {
     break-inside: avoid;
     page-break-inside: avoid;
   }
