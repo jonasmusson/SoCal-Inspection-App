@@ -84,7 +84,7 @@ export function PremiumInspectionReport({
     const attention = items.filter(item => item.status === 'needs_attention');
     const watching = items.filter(item => item.status === 'monitor');
     const passed = items.filter(item => item.status === 'good');
-    const status = attention.length ? 'attention' : watching.length ? 'monitor' : passed.length ? 'good' : 'not_inspected';
+    const status: keyof typeof STATUS = attention.length ? 'attention' : watching.length ? 'monitor' : passed.length ? 'good' : 'not_inspected';
     const note = attention[0]?.notes || watching[0]?.notes || (passed.length ? `${passed.length} inspected point${passed.length === 1 ? '' : 's'} presented satisfactorily.` : 'No inspection result recorded.');
     return { section, items, attention, watching, passed, status, note };
   });
