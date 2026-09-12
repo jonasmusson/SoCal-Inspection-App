@@ -7,6 +7,7 @@ export type MediaMode = 'hidden' | 'optional' | 'required';
 
 export interface UserProfile {
   id: string;
+  team_profile_id: string | null;
   email: string;
   full_name: string;
   first_name: string | null;
