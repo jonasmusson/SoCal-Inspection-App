@@ -24,17 +24,25 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  normalized_team_profile_id text;
 begin
-  if not public.is_manager() then
+  if not public.is_manager_or_owner() then
     raise exception 'Manager or owner access required';
   end if;
 
-  if target_team_profile_id is null or btrim(target_team_profile_id) = '' then
+  normalized_team_profile_id := btrim(target_team_profile_id);
+
+  if normalized_team_profile_id is null or normalized_team_profile_id = '' then
     raise exception 'Team Profile ID is required';
   end if;
 
+  if length(normalized_team_profile_id) > 100 then
+    raise exception 'Team Profile ID is too long';
+  end if;
+
   update public.user_profiles
-  set team_profile_id = btrim(target_team_profile_id),
+  set team_profile_id = normalized_team_profile_id,
       updated_at = now()
   where id = target_user_id;
 
@@ -44,4 +52,5 @@ begin
 end;
 $$;
 
+revoke all on function public.link_user_team_profile(uuid, text) from public;
 grant execute on function public.link_user_team_profile(uuid, text) to authenticated;
