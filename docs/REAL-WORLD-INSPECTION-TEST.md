@@ -16,6 +16,7 @@ Use this for the first shop-floor inspection run. Treat the run as validation, n
 - Exercise any item configured with required notes/photo/video and confirm the section cannot complete until the required evidence is present.
 - Pause and resume the timer once from the inspection controls.
 - Use Save & Exit once, return to the inspection, and confirm the timer remains paused until explicitly resumed.
+- While the timer is running, use the section-header Back control once and confirm it returns to inspection detail with the timer paused just like Save & Exit.
 - Complete multiple sections and confirm progress advances and previously entered findings remain saved.
 - Note any confusing wording, extra taps, slow media behavior, or anything a technician is tempted to skip.
 
@@ -34,7 +35,7 @@ Compare displayed labor time with the approximate wall-clock test time, subtract
 - Findings persist after navigation and reload.
 - Required-field/media gates behave correctly.
 - Photo and video uploads succeed from the phone.
-- Pause/resume and Save & Exit do not inflate labor time.
+- Pause/resume, Save & Exit, and the section-header Back control do not inflate labor time.
 - Final section moves the inspection to Pending Review.
 - Manager can review and generate the report with the captured evidence.
 - No customer report is accidentally sent during validation.
