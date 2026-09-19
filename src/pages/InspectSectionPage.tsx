@@ -245,7 +245,7 @@ export function InspectSectionPage() {
     <div className="pb-28">
       <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
         <div className="flex items-center gap-3 mb-2">
-          <button aria-label="Back to inspection" onClick={() => navigate(`/inspection/${id}`)} className="text-gray-600"><ArrowLeft className="w-6 h-6" /></button>
+          <button aria-label="Back to inspection" onClick={saveAndExit} className="text-gray-600"><ArrowLeft className="w-6 h-6" /></button>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-gray-500">Section {sectionNum} of {totalSections}</p>
             <h1 className="font-semibold text-gray-900 truncate">{section.section_name}</h1>
