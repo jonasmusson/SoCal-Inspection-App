@@ -13,7 +13,13 @@ The first pilot is not a feature tour. It should answer four questions:
 
 ## Phase 0 — No-write phone UX review
 
-Use the review-only Add Work demo before any isolated database setup.
+Use the review-only Workshop demos before any isolated database setup:
+
+- /review/hub/pilot — technician home / day flow
+- /review/hub/add-work — talk-to-text work entry
+- /review/hub/manage — owner/manager view
+
+All three demo routes are designed to make no HUB writes.
 
 ### Voice / transcript
 
@@ -64,14 +70,16 @@ Do not connect a real customer invoice.
 5. Claim one eligible task.
 6. Start Work.
 7. Stop Work.
-8. Add Work using talk-to-text.
-9. Review transcript.
-10. Organize Work.
-11. Correct wording/hours.
-12. Save as Pending Review.
-13. Request a part.
-14. Mark one task Blocked or Waiting through the normal task workflow.
-15. Clock Out.
+8. Confirm Document Work carries the same project/task and displays elapsed time only as an optional suggestion.
+9. Add Work using talk-to-text.
+10. Review transcript.
+11. Organize Work.
+12. Correct wording/hours; deliberately choose whether to use the stopped-session time suggestion.
+13. Save as Pending Review.
+14. Request a part.
+15. Record one Other Time / Constraint entry.
+16. Mark one task Blocked or Waiting through the normal task workflow.
+17. Clock Out.
 
 Record:
 - taps required;
