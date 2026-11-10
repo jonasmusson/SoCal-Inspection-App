@@ -89,6 +89,21 @@ export function PremiumInspectionReport({
     return { section, items, attention, watching, passed, status, note };
   });
 
+  const technicianNotes = allItems.filter(item => item.notes?.trim());
+  const evidencePhotoCount = photos.length;
+  const fullRecordRows = sections.map(section => ({
+    section,
+    items: allItems
+      .filter(item => item.section_id === section.id)
+      .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || ''))),
+  }));
+  const itemStatusMeta = (status: InspectionItem['status']) => {
+    if (status === 'needs_attention') return STATUS.attention;
+    if (status === 'monitor') return STATUS.monitor;
+    if (status === 'good') return STATUS.good;
+    return STATUS.not_inspected;
+  };
+
   const roadmap = (['immediate', 'short_term', 'long_term', 'upgrade'] as PriorityLevel[]).map(priority => ({
     priority,
     meta: PRIORITY[priority],
@@ -156,6 +171,19 @@ export function PremiumInspectionReport({
             ].map(([label, value, color], index) => <div key={String(label)} className={`px-4 py-5 ${index !== 3 ? 'sm:border-r' : ''} border-[#bbb29f]`}><p className="text-4xl font-black" style={{ color: String(color) }}>{value}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[.16em] text-stone-500">{label}</p></div>)}
           </div>
 
+          <div className="mt-6 grid grid-cols-3 border-y border-[#bbb29f]">
+            {[
+              ['Technician notes', technicianNotes.length],
+              ['Inspection photos', evidencePhotoCount],
+              ['Check-in photos', checkinPhotos.length],
+            ].map(([label, value], index) => (
+              <div key={String(label)} className={`px-4 py-4 ${index < 2 ? 'border-r' : ''} border-[#bbb29f]`}>
+                <p className="text-2xl font-black" style={{ color: INK }}>{value}</p>
+                <p className="mt-1 text-[8px] font-black uppercase tracking-[.14em] text-stone-500">{label}</p>
+              </div>
+            ))}
+          </div>
+
           <div className="mt-10 grid overflow-hidden border border-[#a9a18f] lg:grid-cols-[.38fr_.62fr]">
             <div className="p-6 text-white sm:p-8" style={{ backgroundColor: INK }}><p className="text-[9px] font-black uppercase tracking-[.2em]" style={{ color: '#d1ad67' }}>Our recommendation</p><p className="mt-4 font-serif text-3xl italic leading-tight">{overallLabel}</p></div>
             <div className="p-6 sm:p-8"><p className="text-sm leading-7 text-stone-700">{primaryRecommendation || 'Review the findings with your advisor, resolve the highest-priority items first, then build the remaining work into a thoughtful ownership plan.'}</p>{managerNotes && <p className="mt-4 border-t border-[#d4cebf] pt-4 text-xs leading-6 text-stone-500">{managerNotes}</p>}</div>
@@ -217,7 +245,7 @@ export function PremiumInspectionReport({
                         ['Recommended next step', item.recommended_action || 'Review with your advisor and include it in the appropriate repair phase.'],
                       ].map(([label, copy]) => <div key={label} className="border-b border-r border-[#d4cebf] p-4"><p className="text-[8px] font-black uppercase tracking-[.14em]" style={{ color: GOLD }}>{label}</p><p className="mt-2 text-xs leading-5 text-stone-600">{copy}</p></div>)}
                     </div>
-                    {itemPhotos.length ? <div className="mt-3 grid grid-cols-3 gap-2">{itemPhotos.slice(0, 3).map(photo => <img key={photo.id} src={photo.photo_url} alt={`${item.item_name} evidence`} className="h-32 w-full object-cover" />)}</div> : <div className="mt-3 border border-dashed border-[#c7bfaf] px-4 py-5 text-[9px] font-bold uppercase tracking-[.14em] text-stone-400">No evidence photo attached</div>}
+                    {itemPhotos.length ? <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{itemPhotos.map((photo, photoIndex) => <figure key={photo.id} className="overflow-hidden border border-[#d4cebf] bg-white"><img src={photo.photo_url} alt={`${item.item_name} evidence ${photoIndex + 1}`} className="h-32 w-full object-cover" /><figcaption className="px-2 py-1.5 text-[8px] font-bold uppercase tracking-[.1em] text-stone-500">Evidence {photoIndex + 1}</figcaption></figure>)}</div> : <div className="mt-3 border border-dashed border-[#c7bfaf] px-4 py-5 text-[9px] font-bold uppercase tracking-[.14em] text-stone-400">No evidence photo attached</div>}
                   </div>
                 </div>
               </article>;
@@ -227,8 +255,115 @@ export function PremiumInspectionReport({
 
         {good.length > 0 && <section data-report-card className="border-t border-[#bbb29f] px-7 py-10 sm:px-12"><div className="grid gap-6 sm:grid-cols-[auto_1fr]"><p className="text-7xl font-black leading-none" style={{ color: STATUS.good.color }}>{good.length}</p><div><p className="text-[9px] font-black uppercase tracking-[.22em]" style={{ color: STATUS.good.color }}>Checks that gave us confidence</p><h2 className="mt-2 text-2xl font-black">Healthy systems matter, too.</h2><p className="mt-2 text-sm leading-6 text-stone-600">Passed points are retained in the inspection record and summarized here so the report stays focused on decisions.</p></div></div></section>}
 
+        <section data-report-card className="border-t border-[#bbb29f] px-7 py-12 sm:px-12 sm:py-16">
+          <p className="text-[9px] font-black uppercase tracking-[.26em]" style={{ color: GOLD }}>05 · Complete Inspection Record</p>
+          <div className="mt-4 grid gap-6 lg:grid-cols-[.7fr_.3fr]">
+            <div>
+              <h2 className="text-4xl font-black leading-[.96] tracking-[-.04em] sm:text-5xl">Every inspected point.<br />Every recorded note.</h2>
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-stone-600">
+                This appendix preserves the technician&apos;s complete inspection record. Summary pages above focus on decisions; this section shows the underlying item-by-item evidence.
+              </p>
+            </div>
+            <div className="border-l border-[#bbb29f] pl-6">
+              <p className="text-[9px] font-black uppercase tracking-[.18em] text-stone-500">Recorded evidence</p>
+              <p className="mt-2 text-4xl font-black">{allItems.length}</p>
+              <p className="text-xs text-stone-500">inspection points</p>
+              <p className="mt-4 text-2xl font-black">{technicianNotes.length}</p>
+              <p className="text-xs text-stone-500">technician notes</p>
+              <p className="mt-4 text-2xl font-black">{evidencePhotoCount}</p>
+              <p className="text-xs text-stone-500">inspection photos</p>
+            </div>
+          </div>
+
+          <div className="mt-10 space-y-10">
+            {fullRecordRows.map(({ section, items }, sectionIndex) => (
+              <article key={section.id} className="break-inside-avoid">
+                <div className="flex items-end justify-between border-b-2 border-[#a9a18f] pb-3">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[.18em] text-stone-500">System {String(sectionIndex + 1).padStart(2, '0')}</p>
+                    <h3 className="mt-1 text-2xl font-black">{section.section_name}</h3>
+                  </div>
+                  <p className="text-xs font-bold text-stone-500">{items.length} point{items.length === 1 ? '' : 's'}</p>
+                </div>
+
+                <div className="divide-y divide-[#d4cebf]">
+                  {items.map(item => {
+                    const meta = itemStatusMeta(item.status);
+                    const itemPhotos = photos.filter(photo => photo.item_id === item.id);
+                    return (
+                      <div key={item.id} className="py-4">
+                        <div className="grid gap-3 sm:grid-cols-[.34fr_.66fr]">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: meta.color }} />
+                              <p className="text-[8px] font-black uppercase tracking-[.14em]" style={{ color: meta.color }}>{meta.label}</p>
+                            </div>
+                            <p className="mt-1 text-sm font-black text-[#282923]">{item.item_name}</p>
+                          </div>
+                          <div>
+                            {item.notes?.trim() ? (
+                              <p className="text-xs leading-5 text-stone-700">{item.notes}</p>
+                            ) : (
+                              <p className="text-xs italic leading-5 text-stone-400">No technician note recorded.</p>
+                            )}
+                            {(item.impact || item.recommended_action) && (
+                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                {item.impact && <div className="border-l-2 border-[#d4cebf] pl-3"><p className="text-[7px] font-black uppercase tracking-[.12em] text-stone-400">Why it matters</p><p className="mt-1 text-[10px] leading-4 text-stone-600">{item.impact}</p></div>}
+                                {item.recommended_action && <div className="border-l-2 border-[#d4cebf] pl-3"><p className="text-[7px] font-black uppercase tracking-[.12em] text-stone-400">Recommended action</p><p className="mt-1 text-[10px] leading-4 text-stone-600">{item.recommended_action}</p></div>}
+                              </div>
+                            )}
+                            {itemPhotos.length > 0 && (
+                              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                                {itemPhotos.map((photo, photoIndex) => (
+                                  <figure key={photo.id} className="overflow-hidden border border-[#d4cebf] bg-white">
+                                    <img src={photo.photo_url} alt={`${item.item_name} photo ${photoIndex + 1}`} className="h-24 w-full object-cover" />
+                                    <figcaption className="px-1.5 py-1 text-[7px] font-bold uppercase tracking-[.08em] text-stone-400">{photoIndex + 1}</figcaption>
+                                  </figure>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {(checkinPhotos.length > 0 || inspection.checkin_video_url || inspection.checkin_notes) && (
+          <section data-report-card className="border-t border-[#bbb29f] px-7 py-12 sm:px-12 sm:py-16">
+            <p className="text-[9px] font-black uppercase tracking-[.26em]" style={{ color: GOLD }}>06 · Vehicle Check-In Evidence</p>
+            <h2 className="mt-4 text-4xl font-black leading-[.96] tracking-[-.04em] sm:text-5xl">The condition before inspection work began.</h2>
+            {inspection.checkin_notes && (
+              <div className="mt-7 border-l-4 border-[#ad8444] bg-[#eee7d8] p-5">
+                <p className="text-[8px] font-black uppercase tracking-[.16em] text-stone-500">Check-in / customer notes</p>
+                <p className="mt-2 text-sm leading-6 text-stone-700">{inspection.checkin_notes}</p>
+              </div>
+            )}
+            {checkinPhotos.length > 0 && (
+              <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {checkinPhotos.map((photo, index) => (
+                  <figure key={photo.id} className="overflow-hidden border border-[#c8c0b0] bg-white">
+                    <img src={photo.photo_url} alt={`Vehicle check-in ${index + 1}`} className="h-40 w-full object-cover" />
+                    <figcaption className="px-3 py-2 text-[8px] font-black uppercase tracking-[.12em] text-stone-500">Check-in {index + 1}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
+            {inspection.checkin_video_url && (
+              <div className="mt-6 border border-[#bbb29f] p-5">
+                <p className="text-[8px] font-black uppercase tracking-[.16em] text-stone-500">Walk-around video</p>
+                <a href={inspection.checkin_video_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-sm font-black underline underline-offset-4" style={{ color: GOLD }}>Open recorded walk-around video</a>
+              </div>
+            )}
+          </section>
+        )}
+
         <section data-report-card className="px-7 py-14 text-white sm:px-12 sm:py-20" style={{ backgroundColor: INK }}>
-          <p className="text-[9px] font-black uppercase tracking-[.26em] text-[#d1ad67]">05 · The Decision After the Data</p>
+          <p className="text-[9px] font-black uppercase tracking-[.26em] text-[#d1ad67]">07 · The Decision After the Data</p>
           <div className="mt-5 grid gap-8 lg:grid-cols-[.58fr_.42fr]"><div><h2 className="text-4xl font-black leading-[.96] tracking-[-.04em] sm:text-5xl">A report should lead to a conversation.</h2><p className="mt-6 max-w-xl text-sm leading-7 text-white/60">Your advisor will walk through the evidence, answer questions and help build a plan around how you want to own, drive and enjoy the vehicle.</p></div><div className="border-l border-white/20 pl-6 sm:pl-8">{[['01', 'Review the evidence'], ['02', 'Confirm priorities'], ['03', 'Build the estimate'], ['04', 'Authorize your plan']].map(([number, label]) => <div key={number} className="flex items-center gap-4 border-b border-white/15 py-3"><span className="text-sm font-black text-[#d1ad67]">{number}</span><span className="text-sm font-bold">{label}</span></div>)}</div></div>
         </section>
       </main>
