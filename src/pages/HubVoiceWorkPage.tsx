@@ -176,6 +176,11 @@ export function HubVoiceWorkPage({ demoMode = false }: { demoMode?: boolean }) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [draftConfigured, setDraftConfigured] = useState<boolean | null>(null);
+  const query = useMemo(() => new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search), []);
+  const [sessionSuggestedHours] = useState(() => {
+    const value = Number(query.get('hours') || 0);
+    return Number.isFinite(value) && value > 0 && value <= 24 ? Math.round(value * 100) / 100 : 0;
+  });
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const speechBaseRef = useRef('');
 
@@ -198,7 +203,14 @@ export function HubVoiceWorkPage({ demoMode = false }: { demoMode?: boolean }) {
     setError('');
     if (demoMode) {
       setSnapshot(DEMO_SNAPSHOT);
-      setProjectId(current => current || DEMO_SNAPSHOT.projects[0].id);
+      const requestedProject = query.get('project_id');
+      const nextProject = DEMO_SNAPSHOT.projects.some(project => project.id === requestedProject)
+        ? requestedProject!
+        : DEMO_SNAPSHOT.projects[0].id;
+      setProjectId(nextProject);
+      const requestedTask = query.get('task_id');
+      if (DEMO_SNAPSHOT.project_tasks.some(task => task.id === requestedTask && task.project_id === nextProject))
+        setTaskId(requestedTask!);
       setDraftConfigured(true);
       return;
     }
@@ -206,7 +218,14 @@ export function HubVoiceWorkPage({ demoMode = false }: { demoMode?: boolean }) {
       const data = await hubWorkspace<Snapshot>('snapshot');
       setSnapshot(data);
       const first = data.projects.find(project => project.status === 'active') ?? data.projects[0];
-      setProjectId(current => current || first?.id || '');
+      const requestedProject = query.get('project_id');
+      const nextProject = data.projects.some(project => project.id === requestedProject)
+        ? requestedProject!
+        : first?.id || '';
+      setProjectId(nextProject);
+      const requestedTask = query.get('task_id');
+      if (data.project_tasks.some(task => task.id === requestedTask && task.project_id === nextProject))
+        setTaskId(requestedTask!);
       try {
         const status = await hubWorkspace<{ configured: boolean }>('work/draft/status');
         setDraftConfigured(Boolean(status.configured));
@@ -224,7 +243,6 @@ export function HubVoiceWorkPage({ demoMode = false }: { demoMode?: boolean }) {
   }, []);
 
   useEffect(() => {
-    setTaskId('');
     setDraft(null);
     setMessage('');
   }, [projectId]);
@@ -397,7 +415,7 @@ export function HubVoiceWorkPage({ demoMode = false }: { demoMode?: boolean }) {
           <div className="grid gap-4">
             <label className="grid gap-1.5 text-sm font-semibold text-stone-800">
               Project
-              <select value={projectId} onChange={event => setProjectId(event.target.value)}
+              <select value={projectId} onChange={event => { setProjectId(event.target.value); setTaskId(''); setDraft(null); }}
                 className="min-h-12 rounded-xl border border-stone-300 bg-white px-3 text-base">
                 <option value="">Choose project…</option>
                 {snapshot?.projects.filter(project => project.status === 'active').map(project => {
