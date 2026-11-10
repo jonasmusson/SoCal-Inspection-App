@@ -1,8 +1,9 @@
+import {createShopmonkeyWriteClient,ShopmonkeyWriteError} from "./shopmonkey.ts";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
-const VERSION = "0.11.3",
+const VERSION = "0.11.4",
   BUCKET = "hub-pilot-private",
   ARCHIVE = "hub-media-archive";
 const MIME: Record<string, string> = {
@@ -68,6 +69,12 @@ const sha = async (b: ArrayBuffer) =>
     .map((x) => x.toString(16).padStart(2, "0"))
     .join("");
 const serviceHeaders = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
+const shopmonkeyToken=()=>String(Deno.env.get("SHOPMONKEY_API_TOKEN")||"").trim();
+const shopmonkeyClient=()=>{
+  const token=shopmonkeyToken();
+  if(!token)throw new Fault(503,"Shopmonkey write integration is not configured.");
+  return createShopmonkeyWriteClient(token);
+};
 async function fetchSafe(url: string, init: RequestInit = {}) {
   return await fetch(url, {
     ...init,
@@ -386,6 +393,8 @@ async function endpoint(
       member_task_skills,
       parts_requests,
       clipboard_intakes,
+      shopmonkey_project_links,
+      shopmonkey_work_links,
     ] = await Promise.all([
       db("hub_pilot_projects", scope + "&order=created_at.asc&limit=500"),
       db("hub_pilot_media", scope + "&order=created_at.desc&limit=500"),
@@ -425,6 +434,18 @@ async function endpoint(
             "hub_clipboard_intakes",
             scope + "&order=applied_at.desc&limit=500",
           ),
+      m.role === "tech"
+        ? []
+        : db(
+            "hub_shopmonkey_project_links",
+            scope + "&order=verified_at.desc&limit=500",
+          ),
+      m.role === "tech"
+        ? []
+        : db(
+            "hub_shopmonkey_work_links",
+            `org_id=eq.${m.org_id}&project_id=in.(${projects.length ? projects.map((x:any)=>x.id).join(",") : "00000000-0000-0000-0000-000000000000"})&order=synced_at.desc&limit=2000`,
+          ),
     ]);
     const techIds = [
         ...new Set(work_entries.map((x: any) => x.technician_user_id)),
@@ -452,6 +473,8 @@ async function endpoint(
       member_task_skills,
       parts_requests,
       clipboard_intakes,
+      shopmonkey_project_links,
+      shopmonkey_work_links,
       work_profiles,
       work_systems: WORK_SYSTEMS,
       task_statuses: TASK_STATUSES,
@@ -1175,6 +1198,404 @@ async function endpoint(
       ),
     ]);
     return { intake, media, lines };
+  }
+
+  if (action === "shopmonkey/status") {
+    management(m);
+    return {
+      configured: Boolean(shopmonkeyToken()),
+      write_enabled: Boolean(shopmonkeyToken()),
+      boundary:
+        "Shopmonkey remains billing authority. HUB writes require a verified project/order link and an explicit owner sync action.",
+    };
+  }
+  if (action === "shopmonkey/link/verify") {
+    management(m, true);
+    const p = await projectFor(m, id(b.project_id)),
+      remoteOrderId = text(b.remote_order_id, 128);
+    if (!remoteOrderId)
+      throw new Fault(400, "Shopmonkey Order ID is required.");
+    let remote:any;
+    try {
+      remote = await shopmonkeyClient().order(remoteOrderId);
+    } catch (error) {
+      if (error instanceof ShopmonkeyWriteError)
+        throw new Fault(
+          error.status === 429 ? 429 : 502,
+          error.status === 429
+            ? "Shopmonkey rate limit reached. Retry later."
+            : "Shopmonkey Order ID could not be verified.",
+        );
+      throw new Fault(502, "Shopmonkey Order ID could not be verified.");
+    }
+    if (String(remote.id || "") !== remoteOrderId)
+      throw new Fault(409, "Verified Shopmonkey Order ID did not match the requested order.");
+    if (remote.readOnly === true)
+      throw new Fault(409, "This Shopmonkey order is read-only and cannot receive HUB labor.");
+    const remoteNumber = text(remote.number, 128),
+      expectedRef = text(p.shopmonkey_order_ref, 128);
+    if (
+      expectedRef &&
+      remoteNumber &&
+      expectedRef.replace(/^#/, "") !== remoteNumber.replace(/^#/, "")
+    )
+      throw new Fault(
+        409,
+        "The Shopmonkey order number does not match this project reference. Review the project before linking.",
+      );
+    const existing = await one(
+      "hub_shopmonkey_project_links",
+      \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}\`,
+    );
+    const values = {
+      org_id: m.org_id,
+      vehicle_id: p.vehicle_id,
+      remote_order_id: remoteOrderId,
+      remote_order_number: remoteNumber,
+      verified_by: u.id,
+      verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const rows = existing
+      ? await db(
+          "hub_shopmonkey_project_links",
+          \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}\`,
+          "PATCH",
+          values,
+        )
+      : await db("hub_shopmonkey_project_links", "", "POST", {
+          project_id: p.id,
+          ...values,
+        });
+    return {
+      link: rows[0],
+      order: {
+        id: String(remote.id || ""),
+        number: remoteNumber,
+        status: text(remote.status, 100),
+        invoiced: Boolean(remote.invoiced),
+        paid: Boolean(remote.paid),
+        read_only: Boolean(remote.readOnly),
+      },
+    };
+  }
+  if (action === "shopmonkey/preview") {
+    management(m);
+    const p = await projectFor(m, id(url.searchParams.get("project_id"))),
+      link = await one(
+        "hub_shopmonkey_project_links",
+        \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}\`,
+      );
+    if (!link)
+      throw new Fault(409, "Verify the Shopmonkey Order ID for this project first.");
+    let remote:any;
+    try {
+      remote = await shopmonkeyClient().order(link.remote_order_id);
+    } catch (error) {
+      if (error instanceof ShopmonkeyWriteError)
+        throw new Fault(
+          error.status === 429 ? 429 : 502,
+          error.status === 429
+            ? "Shopmonkey rate limit reached. Retry later."
+            : "Shopmonkey order could not be re-verified.",
+        );
+      throw new Fault(502, "Shopmonkey order could not be re-verified.");
+    }
+    if (remote.readOnly === true)
+      throw new Fault(409, "This Shopmonkey order is read-only.");
+    const entries = await db(
+        "hub_work_entries",
+        \`org_id=eq.\${m.org_id}&project_id=eq.\${p.id}&status=eq.approved&invoice_state=eq.ready&order=work_date.asc,created_at.asc&limit=1000\`,
+      ),
+      entryIds = entries.map((x:any) => x.id),
+      linked = entryIds.length
+        ? await db(
+            "hub_shopmonkey_work_links",
+            \`org_id=eq.\${m.org_id}&work_entry_id=in.(\${entryIds.join(",")})\`,
+          )
+        : [],
+      linkedIds = new Set(linked.map((x:any) => x.work_entry_id)),
+      ready = entries.filter(
+        (entry:any) =>
+          !linkedIds.has(entry.id) &&
+          entry.billable_hours != null &&
+          Number(entry.billable_hours) > 0,
+      ),
+      groups = new Map<string,any[]>();
+    for (const entry of ready) {
+      const key = WORK_SYSTEMS.includes(entry.system) ? entry.system : "General",
+        rows = groups.get(key) || [];
+      rows.push(entry);
+      groups.set(key, rows);
+    }
+    return {
+      project_id: p.id,
+      vehicle_id: p.vehicle_id,
+      shopmonkey_order: {
+        id: link.remote_order_id,
+        number: text(remote.number, 128),
+        status: text(remote.status, 100),
+        invoiced: Boolean(remote.invoiced),
+        paid: Boolean(remote.paid),
+      },
+      ready_entry_count: ready.length,
+      ready_billable_hours: Math.round(
+        ready.reduce((sum:number,row:any)=>sum+Number(row.billable_hours||0),0)*100,
+      )/100,
+      groups: [...groups.entries()].map(([system,rows])=>({
+        system,
+        entry_count: rows.length,
+        billable_hours: Math.round(
+          rows.reduce((sum:number,row:any)=>sum+Number(row.billable_hours||0),0)*100,
+        )/100,
+        entries: rows.map((row:any)=>({
+          id: row.id,
+          work_date: row.work_date,
+          work_performed: row.work_performed,
+          billable_hours: Number(row.billable_hours),
+          technician_user_id: row.technician_user_id,
+        })),
+      })),
+      already_synced_count: linked.length,
+      boundary:
+        "Preview only. No Shopmonkey service or labor has been created by this action.",
+    };
+  }
+  if (action === "shopmonkey/sync") {
+    management(m, true);
+    const requestId = id(b.request_id),
+      p = await projectFor(m, id(b.project_id)),
+      link = await one(
+        "hub_shopmonkey_project_links",
+        \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}\`,
+      ),
+      rateCents = Number(b.rate_cents),
+      requestedIds = Array.isArray(b.work_entry_ids)
+        ? [...new Set(b.work_entry_ids.map(id))]
+        : [];
+    if (!link)
+      throw new Fault(409, "Verify the Shopmonkey Order ID for this project first.");
+    if (!Number.isInteger(rateCents) || rateCents < 0 || rateCents > 1_000_000)
+      throw new Fault(400, "Confirm a valid labor rate before syncing.");
+    if (requestedIds.length < 1 || requestedIds.length > 100)
+      throw new Fault(400, "Choose between 1 and 100 Ready work entries.");
+    const payloadText = JSON.stringify({
+        project_id: p.id,
+        order_id: link.remote_order_id,
+        rate_cents: rateCents,
+        work_entry_ids: [...requestedIds].sort(),
+      }),
+      payloadHash = await sha(new TextEncoder().encode(payloadText).buffer),
+      existingRun = await one(
+        "hub_shopmonkey_sync_runs",
+        \`id=eq.\${requestId}&org_id=eq.\${m.org_id}\`,
+      );
+    if (existingRun) {
+      if (
+        existingRun.actor_id !== u.id ||
+        existingRun.project_id !== p.id ||
+        existingRun.payload_hash !== payloadHash
+      )
+        throw new Fault(409, "Shopmonkey sync request identity conflict.");
+      if (existingRun.status === "complete") return existingRun.result;
+      throw new Fault(
+        409,
+        "This Shopmonkey sync did not finish cleanly. Reconcile the remote order before retrying; HUB will not blindly repeat external writes.",
+      );
+    }
+    const entries = await db(
+      "hub_work_entries",
+      \`org_id=eq.\${m.org_id}&project_id=eq.\${p.id}&id=in.(\${requestedIds.join(",")})\`,
+    );
+    if (entries.length !== requestedIds.length)
+      throw new Fault(400, "One or more selected work entries are unavailable.");
+    const existingLinks = await db(
+      "hub_shopmonkey_work_links",
+      \`org_id=eq.\${m.org_id}&work_entry_id=in.(\${requestedIds.join(",")})\`,
+    );
+    if (existingLinks.length)
+      throw new Fault(409, "One or more selected work entries are already linked to Shopmonkey labor.");
+    for (const entry of entries) {
+      if (
+        entry.status !== "approved" ||
+        entry.invoice_state !== "ready" ||
+        entry.billable_hours == null ||
+        Number(entry.billable_hours) <= 0
+      )
+        throw new Fault(
+          409,
+          "Every selected work entry must be manager-approved, Ready for Invoice and have positive billable hours.",
+        );
+    }
+    let remote:any;
+    try {
+      remote = await shopmonkeyClient().order(link.remote_order_id);
+    } catch (error) {
+      if (error instanceof ShopmonkeyWriteError)
+        throw new Fault(
+          error.status === 429 ? 429 : 502,
+          error.status === 429
+            ? "Shopmonkey rate limit reached. Retry later."
+            : "Shopmonkey order could not be re-verified before sync.",
+        );
+      throw new Fault(502, "Shopmonkey order could not be re-verified before sync.");
+    }
+    if (remote.readOnly === true)
+      throw new Fault(409, "This Shopmonkey order is read-only.");
+    await db("hub_shopmonkey_sync_runs", "", "POST", {
+      id: requestId,
+      org_id: m.org_id,
+      project_id: p.id,
+      remote_order_id: link.remote_order_id,
+      actor_id: u.id,
+      payload_hash: payloadHash,
+      status: "started",
+      requested_work_entry_ids: requestedIds,
+      result: {},
+      error_summary: "",
+    });
+    const client = shopmonkeyClient(),
+      bySystem = new Map<string,any[]>();
+    for (const entry of entries) {
+      const system = WORK_SYSTEMS.includes(entry.system) ? entry.system : "General",
+        rows = bySystem.get(system) || [];
+      rows.push(entry);
+      bySystem.set(system, rows);
+    }
+    const synced:any[] = [];
+    try {
+      for (const [system, rows] of bySystem.entries()) {
+        let serviceLink = await one(
+          "hub_shopmonkey_service_links",
+          \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}&system=eq.\${encodeURIComponent(system)}\`,
+        );
+        if (serviceLink && serviceLink.remote_order_id !== link.remote_order_id)
+          throw new Error("Stored Shopmonkey service mapping belongs to a different order.");
+        if (!serviceLink) {
+          const service = await client.addService(link.remote_order_id, {
+            name: system,
+            note: "",
+          });
+          serviceLink = (
+            await db("hub_shopmonkey_service_links", "", "POST", {
+              org_id: m.org_id,
+              project_id: p.id,
+              system,
+              remote_order_id: link.remote_order_id,
+              remote_service_id: String(service.id),
+              remote_service_name: text(service.name || system, 300),
+              verified_by: u.id,
+              verified_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+          )[0];
+        }
+        for (const entry of rows) {
+          const labor = await client.addLabor(
+            link.remote_order_id,
+            serviceLink.remote_service_id,
+            {
+              hours: Number(entry.billable_hours),
+              name: text(entry.work_performed, 300),
+              note: "",
+              rateCents,
+            },
+          );
+          await db("hub_shopmonkey_work_links", "", "POST", {
+            work_entry_id: entry.id,
+            org_id: m.org_id,
+            project_id: p.id,
+            sync_run_id: requestId,
+            remote_order_id: link.remote_order_id,
+            remote_service_id: serviceLink.remote_service_id,
+            remote_labor_id: String(labor.id),
+            remote_service_name: text(serviceLink.remote_service_name || system, 300),
+            remote_labor_name: text(labor.name || entry.work_performed, 300),
+            synced_hours: Number(entry.billable_hours),
+            synced_rate_cents: rateCents,
+            synced_by: u.id,
+            synced_at: new Date().toISOString(),
+          });
+          const updated = await db(
+            "hub_work_entries",
+            \`id=eq.\${entry.id}&org_id=eq.\${m.org_id}&invoice_state=eq.ready\`,
+            "PATCH",
+            {
+              invoice_state: "synced",
+              updated_by: u.id,
+              updated_at: new Date().toISOString(),
+            },
+          );
+          if (!updated.length)
+            throw new Error(
+              "Shopmonkey labor was created, but the HUB work entry changed before its sync receipt could be finalized.",
+            );
+          synced.push({
+            work_entry_id: entry.id,
+            service_id: serviceLink.remote_service_id,
+            labor_id: String(labor.id),
+            hours: Number(entry.billable_hours),
+            rate_cents: rateCents,
+          });
+        }
+      }
+      const result = {
+        sync_run_id: requestId,
+        project_id: p.id,
+        remote_order_id: link.remote_order_id,
+        synced_count: synced.length,
+        synced,
+      };
+      await db(
+        "hub_shopmonkey_sync_runs",
+        \`id=eq.\${requestId}&org_id=eq.\${m.org_id}\`,
+        "PATCH",
+        {
+          status: "complete",
+          result,
+          error_summary: "",
+          completed_at: new Date().toISOString(),
+        },
+      );
+      await db("hub_activity", "", "POST", {
+        org_id: m.org_id,
+        vehicle_id: p.vehicle_id,
+        project_id: p.id,
+        actor_id: u.id,
+        event_type: "shopmonkey_sync",
+        description:
+          synced.length +
+          " approved HUB labor line" +
+          (synced.length === 1 ? "" : "s") +
+          " synced to Shopmonkey",
+      });
+      return result;
+    } catch (error) {
+      const savedLinks = await db(
+        "hub_shopmonkey_work_links",
+        \`org_id=eq.\${m.org_id}&sync_run_id=eq.\${requestId}\`,
+      );
+      await db(
+        "hub_shopmonkey_sync_runs",
+        \`id=eq.\${requestId}&org_id=eq.\${m.org_id}\`,
+        "PATCH",
+        {
+          status: savedLinks.length ? "partial" : "failed",
+          result: { synced: savedLinks },
+          error_summary:
+            error instanceof ShopmonkeyWriteError
+              ? "Shopmonkey API write failed."
+              : "Shopmonkey handoff stopped before clean completion.",
+          completed_at: new Date().toISOString(),
+        },
+      );
+      if (error instanceof ShopmonkeyWriteError && error.status === 429)
+        throw new Fault(429, "Shopmonkey rate limit reached during sync. Reconcile the order before retrying.");
+      throw new Fault(
+        502,
+        "Shopmonkey handoff did not finish cleanly. Reconcile the remote order before any retry.",
+      );
+    }
   }
   if (action === "timeline/add") {
     const v = await vehicleFor(m, id(b.vehicle_id)),
