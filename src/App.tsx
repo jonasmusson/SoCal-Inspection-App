@@ -15,6 +15,7 @@ import { TemplatesPage } from './pages/TemplatesPage';
 import { TemplateEditorPage } from './pages/TemplateEditorPage';
 import { CheckInPage } from './pages/CheckInPage';
 import { PublicReportPage } from './pages/PublicReportPage';
+import { HubVoiceWorkPage } from './pages/HubVoiceWorkPage';
 import { supabase, supabaseConfigured } from './lib/supabase';
 import { Clock, LogOut } from 'lucide-react';
 
@@ -120,6 +121,7 @@ function AppRoutes() {
         <Route path="/" element={<Navigate to={defaultRoute} replace />} />
         <Route path="/dashboard" element={isManager || isOwner ? <DashboardPage /> : <Navigate to="/my-inspections" replace />} />
         <Route path="/my-inspections" element={<MyInspectionsPage />} />
+        <Route path="/hub/add-work" element={<HubVoiceWorkPage />} />
         <Route path="/checkin" element={isManager || isOwner ? <CheckInPage /> : <Navigate to="/my-inspections" replace />} />
         <Route path="/inspection/:id" element={<InspectionDetailPage />} />
         <Route path="/inspect/:id" element={<InspectRedirect />} />
