@@ -2648,7 +2648,7 @@ if (action === "timeclock/punch") {
       throw new Fault(400, "Week start must be a Monday in YYYY-MM-DD format.");
     const weekEnd = nextWeekStart(weekStart),
       settings = await hubSettingsFor(m);
-    const [members, shifts, entries, tasks] = await Promise.all([
+    const [members, shifts, entries, tasks, capacity] = await Promise.all([
       db(
         "hub_pilot_members",
         `org_id=eq.${m.org_id}&active=eq.true&order=created_at.asc`,
@@ -2664,6 +2664,10 @@ if (action === "timeclock/punch") {
       db(
         "hub_project_tasks",
         `org_id=eq.${m.org_id}&status=neq.done&order=project_id.asc,sort_order.asc,created_at.asc&limit=5000`,
+      ),
+      db(
+        "hub_capacity_entries",
+        `org_id=eq.${m.org_id}&work_date=gte.${weekStart}&work_date=lt.${weekEnd}&order=work_date.asc,created_at.asc&limit=5000`,
       ),
     ]);
     const productionMembers = members.filter((x: any) => x.role !== "owner"),
@@ -2685,6 +2689,17 @@ if (action === "timeclock/punch") {
           ),
           personTasks = tasks.filter(
             (x: any) => x.assigned_user_id === member.user_id,
+          ),
+          personCapacity = capacity.filter(
+            (x: any) =>
+              x.technician_user_id === member.user_id &&
+              x.review_status !== "void",
+          ),
+          approvedCapacity = personCapacity.filter(
+            (x: any) => x.review_status === "approved",
+          ),
+          approvedProjectEntries = personEntries.filter(
+            (x: any) => x.status === "approved",
           );
         let attendanceHours = 0,
           openShiftCount = 0;
@@ -2726,6 +2741,82 @@ if (action === "timeclock/punch") {
           pendingCount = personEntries.filter(
             (row: any) => row.status === "pending_review",
           ).length,
+          pendingCapacityHours = personCapacity.reduce(
+            (sum: number, row: any) =>
+              sum +
+              (row.review_status === "pending_review"
+                ? Number(row.hours || 0)
+                : 0),
+            0,
+          ),
+          approvedProjectHours = approvedProjectEntries.reduce(
+            (sum: number, row: any) => sum + Number(row.actual_hours || 0),
+            0,
+          ),
+          productiveCapacityHours = approvedCapacity.reduce(
+            (sum: number, row: any) =>
+              sum +
+              (row.credit_class === "productive" ? Number(row.hours || 0) : 0),
+            0,
+          ),
+          constrainedHours = approvedCapacity.reduce(
+            (sum: number, row: any) =>
+              sum +
+              (row.credit_class === "constrained" ? Number(row.hours || 0) : 0),
+            0,
+          ),
+          explicitUnaccountedHours = approvedCapacity.reduce(
+            (sum: number, row: any) =>
+              sum +
+              (row.credit_class === "unaccounted" ? Number(row.hours || 0) : 0),
+            0,
+          ),
+          contributionHours = (type: string) =>
+            approvedProjectEntries.reduce(
+              (sum: number, row: any) =>
+                sum +
+                (row.contribution_type === type
+                  ? Number(row.actual_hours || 0)
+                  : 0),
+              0,
+            ),
+          customerProductionHours = contributionHours("customer_production"),
+          customerSupportHours = contributionHours("customer_support"),
+          internalInvestmentHours = contributionHours("internal_investment"),
+          shopOperationsHours = contributionHours("shop_operations"),
+          trainingSupervisionHours = contributionHours("training_supervision"),
+          reworkWarrantyHours = contributionHours("rework_warranty"),
+          productiveCreditHours =
+            approvedProjectHours + productiveCapacityHours,
+          managementAllocatedNonCustomerHours =
+            customerSupportHours +
+            internalInvestmentHours +
+            shopOperationsHours +
+            trainingSupervisionHours +
+            reworkWarrantyHours +
+            productiveCapacityHours,
+          customerProductionOpportunityHours = Math.max(
+            0,
+            attendanceHours -
+              managementAllocatedNonCustomerHours -
+              constrainedHours,
+          ),
+          inferredUnaccountedHours = Math.max(
+            0,
+            attendanceHours -
+              productiveCreditHours -
+              constrainedHours -
+              explicitUnaccountedHours,
+          ),
+          totalUnaccountedHours =
+            explicitUnaccountedHours + inferredUnaccountedHours,
+          overAccountedHours = Math.max(
+            0,
+            productiveCreditHours +
+              constrainedHours +
+              explicitUnaccountedHours -
+              attendanceHours,
+          ),
           assignedReadyHours = personTasks.reduce(
             (sum: number, task: any) =>
               sum + (task.status === "todo" ? Number(task.estimated_hours || 0) : 0),
@@ -2747,10 +2838,44 @@ if (action === "timeclock/punch") {
           recorded_billable_hours: round2(recordedBillableHours),
           approved_billable_hours: round2(approvedBillableHours),
           pending_project_hours: round2(pendingProjectHours),
+          pending_capacity_hours: round2(pendingCapacityHours),
           pending_review_count: pendingCount,
-          utilization_percent: pct(approvedBillableHours, attendanceHours),
+          productive_credit_hours: round2(productiveCreditHours),
+          customer_production_hours: round2(customerProductionHours),
+          customer_support_hours: round2(customerSupportHours),
+          internal_investment_hours: round2(internalInvestmentHours),
+          shop_operations_hours: round2(shopOperationsHours),
+          training_supervision_hours: round2(trainingSupervisionHours),
+          rework_warranty_hours: round2(reworkWarrantyHours),
+          non_project_productive_hours: round2(productiveCapacityHours),
+          constrained_hours: round2(constrainedHours),
+          unaccounted_hours: round2(totalUnaccountedHours),
+          over_accounted_hours: round2(overAccountedHours),
+          management_allocated_non_customer_hours: round2(
+            managementAllocatedNonCustomerHours,
+          ),
+          customer_production_opportunity_hours: round2(
+            customerProductionOpportunityHours,
+          ),
+          utilization_percent: pct(productiveCreditHours, attendanceHours),
+          productive_utilization_percent: pct(
+            productiveCreditHours,
+            attendanceHours,
+          ),
+          billable_utilization_percent: pct(
+            approvedBillableHours,
+            attendanceHours,
+          ),
+          customer_production_opportunity_percent: pct(
+            customerProductionHours,
+            customerProductionOpportunityHours,
+          ),
+          billable_conversion_percent: pct(
+            approvedBillableHours,
+            customerProductionHours,
+          ),
           project_coverage_percent: pct(projectHours, attendanceHours),
-          efficiency_percent: pct(approvedBillableHours, projectHours),
+          efficiency_percent: pct(approvedBillableHours, customerProductionHours),
           weekly_billable_target: target,
           target_attainment_percent: pct(approvedBillableHours, target),
           approved_labor_value: round2(approvedBillableHours * rate),
@@ -2770,7 +2895,10 @@ if (action === "timeclock/punch") {
         round2(list.reduce((total, task) => total + Number(task.estimated_hours || 0), 0)),
       shopAttendance = sum("attendance_hours"),
       shopProject = sum("project_hours"),
-      shopApproved = sum("approved_billable_hours");
+      shopApproved = sum("approved_billable_hours"),
+      shopProductiveCredit = sum("productive_credit_hours"),
+      shopCustomerProduction = sum("customer_production_hours"),
+      shopOpportunity = sum("customer_production_opportunity_hours");
     return {
       week_start: weekStart,
       week_end_exclusive: weekEnd,
@@ -2786,6 +2914,22 @@ if (action === "timeclock/punch") {
         approved_billable_hours: shopApproved,
         recorded_billable_hours: sum("recorded_billable_hours"),
         pending_project_hours: sum("pending_project_hours"),
+        pending_capacity_hours: sum("pending_capacity_hours"),
+        productive_credit_hours: shopProductiveCredit,
+        customer_production_hours: shopCustomerProduction,
+        customer_support_hours: sum("customer_support_hours"),
+        internal_investment_hours: sum("internal_investment_hours"),
+        shop_operations_hours: sum("shop_operations_hours"),
+        training_supervision_hours: sum("training_supervision_hours"),
+        rework_warranty_hours: sum("rework_warranty_hours"),
+        non_project_productive_hours: sum("non_project_productive_hours"),
+        constrained_hours: sum("constrained_hours"),
+        unaccounted_hours: sum("unaccounted_hours"),
+        over_accounted_hours: sum("over_accounted_hours"),
+        management_allocated_non_customer_hours: sum(
+          "management_allocated_non_customer_hours",
+        ),
+        customer_production_opportunity_hours: shopOpportunity,
         pending_review_count: rows.reduce(
           (total: number, row: any) => total + row.pending_review_count,
           0,
@@ -2796,9 +2940,22 @@ if (action === "timeclock/punch") {
         ),
         target_billable_hours: round2(rows.length * target),
         target_attainment_percent: pct(shopApproved, rows.length * target),
-        utilization_percent: pct(shopApproved, shopAttendance),
+        utilization_percent: pct(shopProductiveCredit, shopAttendance),
+        productive_utilization_percent: pct(
+          shopProductiveCredit,
+          shopAttendance,
+        ),
+        billable_utilization_percent: pct(shopApproved, shopAttendance),
+        customer_production_opportunity_percent: pct(
+          shopCustomerProduction,
+          shopOpportunity,
+        ),
+        billable_conversion_percent: pct(
+          shopApproved,
+          shopCustomerProduction,
+        ),
         project_coverage_percent: pct(shopProject, shopAttendance),
-        efficiency_percent: pct(shopApproved, shopProject),
+        efficiency_percent: pct(shopApproved, shopCustomerProduction),
         approved_labor_value: round2(shopApproved * rate),
       },
       work_queue: {
@@ -2813,7 +2970,7 @@ if (action === "timeclock/punch") {
       },
       technicians: rows,
       boundary:
-        "Attendance, project work and approved billable hours remain separate sources. Open shifts are not counted as completed attendance. Labor value is approved billable hours multiplied by the configured shop rate; it is not an invoice, payment or accounting total.",
+        "Attendance, contribution, capacity allocation, constraints and billing remain separate facts. Productive Credit counts approved useful work whether or not it is customer-billable. Customer Production Opportunity subtracts approved management-allocated non-customer work and approved constraints from attendance; unaccounted time remains visible instead of being excused. Open shifts are not completed attendance. Labor value is not an invoice, payment or accounting total.",
     };
   }
   if (action === "management/review-queue") {
