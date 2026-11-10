@@ -153,9 +153,23 @@ export function HubPilotPage({ demoMode = false }: { demoMode?: boolean }) {
   const [partName, setPartName] = useState('');
   const [partQty, setPartQty] = useState('1');
   const [partNotes, setPartNotes] = useState('');
+  const [lastStopped, setLastStopped] = useState<{ project_id: string; task_id: string | null; suggested_hours: number } | null>(null);
 
   const currentTask = home?.work.current_task ?? null;
   const activeSession = home?.work.active_session ?? null;
+  const addWorkContext = lastStopped ?? (currentTask ? {
+    project_id: currentTask.project_id,
+    task_id: currentTask.id,
+    suggested_hours: 0,
+  } : null);
+  const addWorkPath = (() => {
+    const base = demoMode ? '/review/hub/add-work' : '/hub/add-work';
+    if (!addWorkContext) return base;
+    const params = new URLSearchParams({ project_id: addWorkContext.project_id });
+    if (addWorkContext.task_id) params.set('task_id', addWorkContext.task_id);
+    if (addWorkContext.suggested_hours > 0) params.set('hours', String(addWorkContext.suggested_hours));
+    return base + '?' + params.toString();
+  })();
 
   const pendingCount = useMemo(
     () => (home?.pending_work_entries.length ?? 0),
@@ -244,6 +258,7 @@ export function HubPilotPage({ demoMode = false }: { demoMode?: boolean }) {
     setError('');
     setMessage('');
     if (demoMode) {
+      setLastStopped(null);
       demoUpdate(next => {
         next.work.active_session = {
           id: 'demo-session',
@@ -259,6 +274,7 @@ export function HubPilotPage({ demoMode = false }: { demoMode?: boolean }) {
       return;
     }
     try {
+      setLastStopped(null);
       await hubWorkspace('work-session/start', {
         method: 'POST',
         body: { project_id: task.project_id, task_id: task.id },
@@ -278,10 +294,15 @@ export function HubPilotPage({ demoMode = false }: { demoMode?: boolean }) {
     setError('');
     setMessage('');
     if (demoMode) {
+      setLastStopped({
+        project_id: activeSession.project_id,
+        task_id: activeSession.task_id,
+        suggested_hours: 1.5,
+      });
       demoUpdate(next => {
         next.work.active_session = null;
       });
-      setMessage('Demo: work stopped. Next step is Add Work to describe what you did.');
+      setMessage('Demo: work stopped. Add Work now carries this project/task and a suggested 1.5 hrs.');
       setBusy('');
       return;
     }
@@ -290,7 +311,12 @@ export function HubPilotPage({ demoMode = false }: { demoMode?: boolean }) {
         method: 'POST',
         body: { id: activeSession.id },
       });
-      setMessage(`Work stopped. Suggested project time: ${result.suggested_actual_hours} hrs. Add Work to document it.`);
+      setLastStopped({
+        project_id: activeSession.project_id,
+        task_id: activeSession.task_id,
+        suggested_hours: result.suggested_actual_hours,
+      });
+      setMessage(`Work stopped. Suggested project time: ${result.suggested_actual_hours} hrs. Add Work will carry this context forward.`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not stop work.');
@@ -474,9 +500,9 @@ export function HubPilotPage({ demoMode = false }: { demoMode?: boolean }) {
         </section>
 
         <section className="grid grid-cols-2 gap-3">
-          <button type="button" onClick={() => navigate(demoMode ? '/review/hub/add-work' : '/hub/add-work')}
+          <button type="button" onClick={() => navigate(addWorkPath)}
             className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl bg-stone-950 p-3 font-bold text-white shadow-sm">
-            <Mic className="h-6 w-6" /> Add Work
+            <Mic className="h-6 w-6" /> {lastStopped ? 'Document Work' : 'Add Work'}
           </button>
           <button type="button" onClick={() => setPartsOpen(value => !value)}
             className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl border border-stone-300 bg-white p-3 font-bold text-stone-900 shadow-sm">
