@@ -90,3 +90,30 @@ test("Incomplete media recovery produces a visible warning instead of silently d
   assert.ok(page.includes("restoredPhotos.length !== draft.photo_ids.length"));
   assert.ok(page.includes("one or more local media files could not be recovered"));
 });
+
+
+test("iPhone Record Video uses native capture and saves the draft before opening camera",()=>{
+  const page=read("src/pages/CheckInPage.tsx");
+  assert.ok(page.includes("preferNativeVideoCapture"));
+  assert.ok(page.includes("/iPhone|iPad|iPod/i"));
+  assert.ok(page.includes('capture="environment"'));
+  assert.ok(page.includes("persistDraftNow();"));
+  assert.ok(page.includes("if (nativeVideoCapture) videoCaptureInputRef.current?.click();"));
+  const controls=page.slice(page.indexOf("Record Video")-1800,page.indexOf("Upload Video")+1000);
+  assert.ok(controls.indexOf("persistDraftNow();") < controls.indexOf("videoCaptureInputRef.current?.click()"));
+});
+
+test("Native video capture returns through the same durable draft-video path",()=>{
+  const page=read("src/pages/CheckInPage.tsx");
+  assert.ok(page.includes("void handleVideoUpload(e.target.files?.[0])"));
+  assert.ok(page.includes("await saveDraftVideo(file)"));
+  assert.ok(page.includes("saveCheckinDraftMedia(profile.id, id, 'video', file)"));
+});
+
+test("Custom recorder waits for async video persistence before considering handoff complete",()=>{
+  const camera=read("src/components/common/CameraComponents.tsx");
+  assert.ok(camera.includes("onCapture: (file: File) => void | Promise<void>"));
+  assert.ok(camera.includes("await onCapture(file)"));
+  assert.ok(camera.includes("Saving Video…"));
+  assert.ok(camera.includes("The video is still on this preview."));
+});
