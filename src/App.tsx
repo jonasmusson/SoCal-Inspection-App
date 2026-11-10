@@ -16,6 +16,7 @@ import { TemplateEditorPage } from './pages/TemplateEditorPage';
 import { CheckInPage } from './pages/CheckInPage';
 import { PublicReportPage } from './pages/PublicReportPage';
 import { HubVoiceWorkPage } from './pages/HubVoiceWorkPage';
+import { HubPilotPage } from './pages/HubPilotPage';
 import { supabase, supabaseConfigured } from './lib/supabase';
 import { Clock, LogOut } from 'lucide-react';
 
@@ -97,6 +98,10 @@ function AppRoutes() {
     return <Routes><Route path="/review/hub/add-work" element={<HubVoiceWorkPage demoMode />} /></Routes>;
   }
 
+  if (location.pathname === '/review/hub/pilot') {
+    return <Routes><Route path="/review/hub/pilot" element={<HubPilotPage demoMode />} /></Routes>;
+  }
+
   if (loading) return <LoadingScreen />;
 
   if (isPasswordRecovery) {
@@ -117,7 +122,7 @@ function AppRoutes() {
     return <PendingApprovalScreen />;
   }
 
-  const defaultRoute = profile?.role === 'tech' ? '/my-inspections' : '/dashboard';
+  const defaultRoute = profile?.role === 'tech' ? '/hub/pilot' : '/dashboard';
 
   return (
     <Layout>
@@ -125,6 +130,7 @@ function AppRoutes() {
         <Route path="/" element={<Navigate to={defaultRoute} replace />} />
         <Route path="/dashboard" element={isManager || isOwner ? <DashboardPage /> : <Navigate to="/my-inspections" replace />} />
         <Route path="/my-inspections" element={<MyInspectionsPage />} />
+        <Route path="/hub/pilot" element={<HubPilotPage />} />
         <Route path="/hub/add-work" element={<HubVoiceWorkPage />} />
         <Route path="/checkin" element={isManager || isOwner ? <CheckInPage /> : <Navigate to="/my-inspections" replace />} />
         <Route path="/inspection/:id" element={<InspectionDetailPage />} />
@@ -141,7 +147,10 @@ function AppRoutes() {
 }
 
 function App() {
-  const reviewDemo = typeof window !== 'undefined' && window.location.pathname === '/review/hub/add-work';
+  const reviewDemo = typeof window !== 'undefined' && (
+    window.location.pathname === '/review/hub/add-work' ||
+    window.location.pathname === '/review/hub/pilot'
+  );
   if (!supabaseConfigured && !reviewDemo) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center px-6">
