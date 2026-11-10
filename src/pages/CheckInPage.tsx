@@ -128,6 +128,12 @@ export function CheckInPage() {
         setLocalVideoId(restoredVideo ? draft.video_id : null);
         setDraftSavedAt(new Date(draft.saved_at));
         setDraftRestored(true);
+        if (
+          restoredPhotos.length !== draft.photo_ids.length ||
+          Boolean(draft.video_id && !restoredVideo)
+        ) {
+          setDraftWarning('Check-in details were restored, but one or more local media files could not be recovered.');
+        }
       } catch {
         if (!cancelled) {
           setDraftWarning('The check-in details were restored, but one or more local media files could not be recovered.');
