@@ -48,7 +48,7 @@ test("Productivity summary keeps attendance, project and approved billable hours
   assert.ok(summary.includes('row.status === "approved" && row.billable_hours != null'));
   assert.ok(summary.includes('row.status === "pending_review"'));
   assert.ok(summary.includes("if (!shift.clock_out)"));
-  assert.ok(summary.includes("Open shifts are not counted as completed attendance."));
+  assert.ok(summary.includes("Open shifts are not completed attendance."));
 });
 
 test("Owner role does not inflate the default production target",()=>{
@@ -74,7 +74,4 @@ test("Management dashboard includes work-queue bottlenecks",()=>{
   ]) assert.ok(summary.includes(text),text);
 });
 
-test("Labor value is explicitly not treated as invoice or accounting truth",()=>{
-  const source=read("supabase/functions/socal-hub-workspace/index.ts");
-  assert.ok(source.includes("Labor value is approved billable hours multiplied by the configured shop rate; it is not an invoice, payment or accounting total."));
-});
+test("Labor value and contribution analytics are explicitly not accounting truth",()=>{\n  const source=read("supabase/functions/socal-hub-workspace/index.ts");\n  assert.ok(source.includes("Labor value is not an invoice, payment or accounting total."));\n  assert.ok(source.includes("Attendance, contribution, capacity allocation, constraints and billing remain separate facts."));\n});
