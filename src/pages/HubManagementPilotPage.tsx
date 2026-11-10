@@ -233,6 +233,7 @@ export function HubManagementPilotPage({ demoMode = false }: { demoMode?: boolea
           <nav className="mx-auto grid max-w-2xl grid-cols-3 gap-2 rounded-xl bg-white p-2 text-xs font-bold shadow-sm">
             <a href="/review/hub/pilot" className="rounded-lg px-2 py-2 text-center text-stone-700">Tech Home</a>
             <a href="/review/hub/add-work" className="rounded-lg px-2 py-2 text-center text-stone-700">Add Work</a>
+            <a href="/review/hub/photos" className="rounded-lg px-2 py-2 text-center text-stone-700">Photos</a>
             <a href="/review/hub/manage" className="rounded-lg bg-stone-950 px-2 py-2 text-center text-white">Management</a>
           </nav>
         )}
