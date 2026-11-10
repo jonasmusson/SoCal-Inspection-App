@@ -42,6 +42,12 @@ Stop if required baseline tables/functions are missing, scope anomalies are nonz
    - depends on project tasks;
    - Start Work / Stop Work remains separate from attendance and billing.
 
+9. hub-contribution-capacity-v1.sql
+   - adds project/work contribution and economic classifications;
+   - adds reviewed productive / constrained / unaccounted capacity entries;
+   - depends on project tasks and canonical work entries;
+   - must exist before contribution-aware Productivity and Review Queue endpoints are deployed.
+
 ## Edge Function deployment
 
 Only after all approved migrations exist in the isolated environment, deploy the combined socal-hub-workspace source from the green integrated release candidate.
@@ -68,14 +74,16 @@ Never place either value in frontend code or Git.
 7. Submit a manual digital work entry.
 8. Test transcript-to-draft; confirm no save occurs automatically.
 9. Create and progress a Parts Request.
-10. Confirm management Review Queue and Productivity.
-11. Test clipboard photo apply twice with the same request ID; confirm no duplicate work.
-12. Verify a disposable/test Shopmonkey Order ID.
-13. Run Shopmonkey preview.
-14. Perform the first external write only on the designated test order.
-15. Confirm remote service/labor IDs are persisted and retry cannot double-post.
-16. Run Supabase security/performance advisors.
-17. Run full Inspection App QA again against the exact release source.
+10. Record customer support / transport, internal investment and one constraint entry.
+11. Approve/correct the capacity entries and confirm Productive Credit / Customer Production Opportunity.
+12. Confirm management Review Queue and Productivity.
+13. Test clipboard photo apply twice with the same request ID; confirm no duplicate work.
+14. Verify a disposable/test Shopmonkey Order ID.
+15. Run Shopmonkey preview.
+16. Perform the first external write only on the designated test order.
+17. Confirm remote service/labor IDs are persisted and retry cannot double-post.
+18. Run Supabase security/performance advisors.
+19. Run full Inspection App QA again against the exact release source.
 
 ## Production stop conditions
 
