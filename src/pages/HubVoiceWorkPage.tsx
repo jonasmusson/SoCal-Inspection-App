@@ -520,6 +520,15 @@ export function HubVoiceWorkPage({ demoMode = false }: { demoMode?: boolean }) {
               </label>
 
               <div className="grid grid-cols-2 gap-3">
+                {sessionSuggestedHours > 0 && (
+                  <div className="col-span-2 flex items-center justify-between gap-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-950">
+                    <span><strong>Stopped-session suggestion:</strong> {sessionSuggestedHours} hrs</span>
+                    <button type="button" onClick={() => setDraft({ ...draft, actual_hours: sessionSuggestedHours })}
+                      className="min-h-9 rounded-lg border border-emerald-800 bg-white px-3 text-xs font-bold">
+                      Use time
+                    </button>
+                  </div>
+                )}
                 <label className="grid gap-1.5 text-sm font-semibold text-stone-800">
                   Project hours
                   <input type="number" min="0.1" max="24" step="0.1"
