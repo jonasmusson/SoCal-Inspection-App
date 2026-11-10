@@ -3,7 +3,7 @@ import {createShopmonkeyWriteClient,ShopmonkeyWriteError} from "./shopmonkey.ts"
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
-const VERSION = "0.11.4",
+const VERSION = "0.13.0",
   BUCKET = "hub-pilot-private",
   ARCHIVE = "hub-media-archive";
 const MIME: Record<string, string> = {
@@ -26,6 +26,9 @@ const CATEGORIES = [
   "Clipboard",
   "Other",
 ];
+const DEFAULT_WEEKLY_BILLABLE_TARGET = 30;
+const DEFAULT_LABOR_RATE = 175;
+const DEFAULT_TIMEZONE = "America/Los_Angeles";
 const PART_REQUEST_STATUSES = ["requested", "ordered", "received", "cancelled"];
 const PART_REQUEST_URGENCY = ["normal", "urgent"];
 const TASK_STATUSES = ["todo", "in_progress", "waiting", "blocked", "done"];
@@ -64,6 +67,16 @@ const text = (x: unknown, n = 160) =>
       .trim()
       .slice(0, n),
   path = (x: string) => x.split("/").map(encodeURIComponent).join("/");
+const shopDate = (value = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: string) => parts.find((x) => x.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+};
 const sha = async (b: ArrayBuffer) =>
   Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b)))
     .map((x) => x.toString(16).padStart(2, "0"))
@@ -216,6 +229,33 @@ async function assertTechnicalSupervisor(
       "Technical supervisor must have access to this vehicle.",
     );
 }
+async function hubSettingsFor(m: any) {
+  const row = await one("hub_org_settings", `org_id=eq.${m.org_id}`);
+  if (!row)
+    return {
+      org_id: m.org_id,
+      weekly_billable_target: DEFAULT_WEEKLY_BILLABLE_TARGET,
+      labor_rate: DEFAULT_LABOR_RATE,
+      timezone: DEFAULT_TIMEZONE,
+      persisted: false,
+    };
+  return { ...row, persisted: true };
+}
+function validWeekStart(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(value + "T00:00:00Z");
+  return Number.isFinite(date.getTime()) &&
+    date.toISOString().slice(0, 10) === value &&
+    date.getUTCDay() === 1;
+}
+function nextWeekStart(value: string) {
+  const date = new Date(value + "T00:00:00Z");
+  date.setUTCDate(date.getUTCDate() + 7);
+  return date.toISOString().slice(0, 10);
+}
+const round2 = (value: number) => Math.round(value * 100) / 100;
+const pct = (value: number, base: number) =>
+  base > 0 ? Math.round((value / base) * 1000) / 10 : 0;
 async function inspectionFor(m: any, pid: string) {
   const p = await projectFor(m, pid),
     l = await one(
@@ -395,6 +435,7 @@ async function endpoint(
       clipboard_intakes,
       shopmonkey_project_links,
       shopmonkey_work_links,
+      timecards,
     ] = await Promise.all([
       db("hub_pilot_projects", scope + "&order=created_at.asc&limit=500"),
       db("hub_pilot_media", scope + "&order=created_at.desc&limit=500"),
@@ -446,6 +487,10 @@ async function endpoint(
             "hub_shopmonkey_work_links",
             `org_id=eq.${m.org_id}&project_id=in.(${projects.length ? projects.map((x:any)=>x.id).join(",") : "00000000-0000-0000-0000-000000000000"})&order=synced_at.desc&limit=2000`,
           ),
+      db(
+        "hub_timecard_shifts",
+        `org_id=eq.${m.org_id}${m.role === "tech" ? "&user_id=eq." + m.user_id : ""}&order=work_date.desc,clock_in.desc&limit=2000`,
+      ),
     ]);
     const techIds = [
         ...new Set(work_entries.map((x: any) => x.technician_user_id)),
@@ -475,6 +520,7 @@ async function endpoint(
       clipboard_intakes,
       shopmonkey_project_links,
       shopmonkey_work_links,
+      timecards,
       work_profiles,
       work_systems: WORK_SYSTEMS,
       task_statuses: TASK_STATUSES,
@@ -1658,7 +1704,375 @@ async function endpoint(
       );
     }
   }
-  if (action === "timeline/add") {
+if (action === "timeclock/punch") {
+    const operation = text(b.operation, 20);
+    if (!["clock_in", "clock_out"].includes(operation))
+      throw new Fault(400, "Choose Clock In or Clock Out.");
+    let target = u.id;
+    if (b.user_id && b.user_id !== u.id) {
+      management(m);
+      target = id(b.user_id);
+    }
+    await activeMemberFor(m, target);
+    const open = await one(
+      "hub_timecard_shifts",
+      `org_id=eq.${m.org_id}&user_id=eq.${target}&clock_out=is.null&order=clock_in.desc`,
+    );
+    if (operation === "clock_in") {
+      if (open) throw new Fault(409, "This team member is already clocked in.");
+      const now = new Date();
+      return await db("hub_timecard_shifts", "", "POST", {
+        org_id: m.org_id,
+        user_id: target,
+        work_date: shopDate(now),
+        clock_in: now.toISOString(),
+        break_minutes: 0,
+        notes: text(b.notes, 2000),
+        manager_note: "",
+        source: target === u.id ? "self" : "manager",
+        created_by: u.id,
+        updated_by: u.id,
+      });
+    }
+    if (!open) throw new Fault(409, "This team member is not clocked in.");
+    const now = new Date(),
+      elapsedMinutes = Math.floor(
+        (now.getTime() - new Date(open.clock_in).getTime()) / 60000,
+      ),
+      breakMinutes =
+        b.break_minutes === undefined
+          ? Number(open.break_minutes || 0)
+          : Number(b.break_minutes);
+    if (elapsedMinutes < 0 || elapsedMinutes > 18 * 60)
+      throw new Fault(
+        409,
+        "This open shift needs manager correction before it can be clocked out.",
+      );
+    if (
+      !Number.isInteger(breakMinutes) ||
+      breakMinutes < 0 ||
+      breakMinutes > Math.min(720, elapsedMinutes)
+    )
+      throw new Fault(400, "Break minutes are invalid for this shift.");
+    const rows = await db(
+      "hub_timecard_shifts",
+      `id=eq.${open.id}&org_id=eq.${m.org_id}&clock_out=is.null&updated_at=eq.${encodeURIComponent(open.updated_at)}`,
+      "PATCH",
+      {
+        clock_out: now.toISOString(),
+        break_minutes: breakMinutes,
+        notes: "notes" in b ? text(b.notes, 2000) : open.notes,
+        updated_by: u.id,
+        updated_at: now.toISOString(),
+      },
+    );
+    if (!rows.length)
+      throw new Fault(
+        409,
+        "This timecard changed on another device. Refresh before clocking out.",
+      );
+    return rows[0];
+  }
+  if (action === "timecard/update") {
+    management(m);
+    const shift = await one(
+      "hub_timecard_shifts",
+      `id=eq.${id(b.id)}&org_id=eq.${m.org_id}`,
+    );
+    if (!shift) throw new Fault(404, "Timecard shift unavailable.");
+    await activeMemberFor(m, shift.user_id);
+    const values: any = {
+      updated_by: u.id,
+      updated_at: new Date().toISOString(),
+      source: "manager",
+    };
+    if ("work_date" in b) {
+      const workDate = text(b.work_date, 10);
+      if (
+        !/^\\d{4}-\\d{2}-\\d{2}$/.test(workDate) ||
+        !Number.isFinite(new Date(workDate + "T12:00:00Z").getTime())
+      )
+        throw new Fault(400, "Choose a valid work date.");
+      values.work_date = workDate;
+    }
+    const parseTimestamp = (value: unknown, label: string) => {
+      if (value === null || value === "") return null;
+      const parsed = new Date(String(value));
+      if (!Number.isFinite(parsed.getTime()))
+        throw new Fault(400, "Choose a valid " + label + ".");
+      return parsed.toISOString();
+    };
+    const nextIn =
+        "clock_in" in b ? parseTimestamp(b.clock_in, "clock-in time") : shift.clock_in,
+      nextOut =
+        "clock_out" in b
+          ? parseTimestamp(b.clock_out, "clock-out time")
+          : shift.clock_out;
+    if (!nextIn) throw new Fault(400, "Clock-in time is required.");
+    if (nextOut) {
+      const elapsed = new Date(nextOut).getTime() - new Date(nextIn).getTime();
+      if (elapsed < 0 || elapsed > 18 * 60 * 60 * 1000)
+        throw new Fault(400, "Completed shifts must be between 0 and 18 hours.");
+    }
+    if ("clock_in" in b) values.clock_in = nextIn;
+    if ("clock_out" in b) values.clock_out = nextOut;
+    if ("break_minutes" in b) {
+      const minutes = Number(b.break_minutes);
+      const elapsedMinutes = nextOut
+        ? Math.floor(
+            (new Date(nextOut).getTime() - new Date(nextIn).getTime()) / 60000,
+          )
+        : 18 * 60;
+      if (
+        !Number.isInteger(minutes) ||
+        minutes < 0 ||
+        minutes > Math.min(720, Math.max(0, elapsedMinutes))
+      )
+        throw new Fault(400, "Break minutes are invalid for this shift.");
+      values.break_minutes = minutes;
+    }
+    if ("notes" in b) values.notes = text(b.notes, 2000);
+    if ("manager_note" in b) values.manager_note = text(b.manager_note, 2000);
+    const rows = await db(
+      "hub_timecard_shifts",
+      `id=eq.${shift.id}&org_id=eq.${m.org_id}${b.expected_updated_at ? "&updated_at=eq." + encodeURIComponent(b.expected_updated_at) : ""}`,
+      "PATCH",
+      values,
+    );
+    if (!rows.length)
+      throw new Fault(
+        409,
+        "This timecard changed on another device. Refresh before saving.",
+      );
+    return rows[0];
+  }
+
+  if (action === "settings/get") {
+    management(m);
+    return await hubSettingsFor(m);
+  }
+  if (action === "settings/update") {
+    management(m, true);
+    const target = Number(b.weekly_billable_target),
+      rate = Number(b.labor_rate),
+      timezone = text(b.timezone || DEFAULT_TIMEZONE, 80);
+    if (!Number.isFinite(target) || target < 0 || target > 100)
+      throw new Fault(400, "Weekly billable target must be between 0 and 100 hours.");
+    if (!Number.isFinite(rate) || rate <= 0 || rate > 2000)
+      throw new Fault(400, "Labor rate must be between 0 and 2000.");
+    if (timezone.length < 3)
+      throw new Fault(400, "Timezone is invalid.");
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
+    } catch {
+      throw new Fault(400, "Timezone is invalid.");
+    }
+    const current = await one("hub_org_settings", `org_id=eq.${m.org_id}`),
+      values = {
+        weekly_billable_target: round2(target),
+        labor_rate: round2(rate),
+        timezone,
+        updated_by: u.id,
+        updated_at: new Date().toISOString(),
+      };
+    if (current) {
+      const rows = await db(
+        "hub_org_settings",
+        `org_id=eq.${m.org_id}`,
+        "PATCH",
+        values,
+      );
+      return rows[0];
+    }
+    const rows = await db("hub_org_settings", "", "POST", {
+      org_id: m.org_id,
+      ...values,
+    });
+    return rows[0];
+  }
+  if (action === "productivity/summary") {
+    management(m);
+    const requested = text(url.searchParams.get("week_start") || "", 10),
+      weekStart = requested || (() => {
+        const today = shopDate(new Date());
+        const date = new Date(today + "T00:00:00Z");
+        const delta = (date.getUTCDay() + 6) % 7;
+        date.setUTCDate(date.getUTCDate() - delta);
+        return date.toISOString().slice(0, 10);
+      })();
+    if (!validWeekStart(weekStart))
+      throw new Fault(400, "Week start must be a Monday in YYYY-MM-DD format.");
+    const weekEnd = nextWeekStart(weekStart),
+      settings = await hubSettingsFor(m);
+    const [members, shifts, entries, tasks] = await Promise.all([
+      db(
+        "hub_pilot_members",
+        `org_id=eq.${m.org_id}&active=eq.true&order=created_at.asc`,
+      ),
+      db(
+        "hub_timecard_shifts",
+        `org_id=eq.${m.org_id}&work_date=gte.${weekStart}&work_date=lt.${weekEnd}&order=work_date.asc,clock_in.asc&limit=5000`,
+      ),
+      db(
+        "hub_work_entries",
+        `org_id=eq.${m.org_id}&work_date=gte.${weekStart}&work_date=lt.${weekEnd}&order=work_date.asc,created_at.asc&limit=5000`,
+      ),
+      db(
+        "hub_project_tasks",
+        `org_id=eq.${m.org_id}&status=neq.done&order=project_id.asc,sort_order.asc,created_at.asc&limit=5000`,
+      ),
+    ]);
+    const productionMembers = members.filter((x: any) => x.role !== "owner"),
+      memberIds = productionMembers.map((x: any) => x.user_id),
+      profiles = memberIds.length
+        ? await db(
+            "user_profiles",
+            `id=in.(${memberIds.join(",")})&select=id,full_name,email`,
+          )
+        : [],
+      profileById = new Map(profiles.map((x: any) => [x.id, x])),
+      target = Number(settings.weekly_billable_target),
+      rate = Number(settings.labor_rate),
+      rows = productionMembers.map((member: any) => {
+        const personShifts = shifts.filter((x: any) => x.user_id === member.user_id),
+          personEntries = entries.filter(
+            (x: any) =>
+              x.technician_user_id === member.user_id && x.status !== "void",
+          ),
+          personTasks = tasks.filter(
+            (x: any) => x.assigned_user_id === member.user_id,
+          );
+        let attendanceHours = 0,
+          openShiftCount = 0;
+        for (const shift of personShifts) {
+          if (!shift.clock_out) {
+            openShiftCount += 1;
+            continue;
+          }
+          const minutes =
+            (new Date(shift.clock_out).getTime() -
+              new Date(shift.clock_in).getTime()) /
+              60000 -
+            Number(shift.break_minutes || 0);
+          if (Number.isFinite(minutes) && minutes > 0)
+            attendanceHours += minutes / 60;
+        }
+        const projectHours = personEntries.reduce(
+            (sum: number, row: any) => sum + Number(row.actual_hours || 0),
+            0,
+          ),
+          recordedBillableHours = personEntries.reduce(
+            (sum: number, row: any) =>
+              sum + (row.billable_hours == null ? 0 : Number(row.billable_hours)),
+            0,
+          ),
+          approvedBillableHours = personEntries.reduce(
+            (sum: number, row: any) =>
+              sum +
+              (row.status === "approved" && row.billable_hours != null
+                ? Number(row.billable_hours)
+                : 0),
+            0,
+          ),
+          pendingProjectHours = personEntries.reduce(
+            (sum: number, row: any) =>
+              sum + (row.status === "pending_review" ? Number(row.actual_hours || 0) : 0),
+            0,
+          ),
+          pendingCount = personEntries.filter(
+            (row: any) => row.status === "pending_review",
+          ).length,
+          assignedReadyHours = personTasks.reduce(
+            (sum: number, task: any) =>
+              sum + (task.status === "todo" ? Number(task.estimated_hours || 0) : 0),
+            0,
+          ),
+          assignedBlockedHours = personTasks.reduce(
+            (sum: number, task: any) =>
+              sum + (task.status === "blocked" ? Number(task.estimated_hours || 0) : 0),
+            0,
+          ),
+          profile = profileById.get(member.user_id) as any;
+        return {
+          user_id: member.user_id,
+          role: member.role,
+          name: profile?.full_name || profile?.email || "Team member",
+          attendance_hours: round2(attendanceHours),
+          open_shift_count: openShiftCount,
+          project_hours: round2(projectHours),
+          recorded_billable_hours: round2(recordedBillableHours),
+          approved_billable_hours: round2(approvedBillableHours),
+          pending_project_hours: round2(pendingProjectHours),
+          pending_review_count: pendingCount,
+          utilization_percent: pct(approvedBillableHours, attendanceHours),
+          project_coverage_percent: pct(projectHours, attendanceHours),
+          efficiency_percent: pct(approvedBillableHours, projectHours),
+          weekly_billable_target: target,
+          target_attainment_percent: pct(approvedBillableHours, target),
+          approved_labor_value: round2(approvedBillableHours * rate),
+          assigned_ready_hours: round2(assignedReadyHours),
+          assigned_blocked_hours: round2(assignedBlockedHours),
+        };
+      }),
+      sum = (field: string) =>
+        round2(rows.reduce((total: number, row: any) => total + Number(row[field] || 0), 0)),
+      unassignedReady = tasks.filter(
+        (task: any) => task.status === "todo" && !task.assigned_user_id,
+      ),
+      blocked = tasks.filter((task: any) => task.status === "blocked"),
+      waiting = tasks.filter((task: any) => task.status === "waiting"),
+      inProgress = tasks.filter((task: any) => task.status === "in_progress"),
+      taskHours = (list: any[]) =>
+        round2(list.reduce((total, task) => total + Number(task.estimated_hours || 0), 0)),
+      shopAttendance = sum("attendance_hours"),
+      shopProject = sum("project_hours"),
+      shopApproved = sum("approved_billable_hours");
+    return {
+      week_start: weekStart,
+      week_end_exclusive: weekEnd,
+      settings: {
+        weekly_billable_target: target,
+        labor_rate: rate,
+        timezone: settings.timezone,
+      },
+      shop: {
+        tech_count: rows.length,
+        attendance_hours: shopAttendance,
+        project_hours: shopProject,
+        approved_billable_hours: shopApproved,
+        recorded_billable_hours: sum("recorded_billable_hours"),
+        pending_project_hours: sum("pending_project_hours"),
+        pending_review_count: rows.reduce(
+          (total: number, row: any) => total + row.pending_review_count,
+          0,
+        ),
+        open_shift_count: rows.reduce(
+          (total: number, row: any) => total + row.open_shift_count,
+          0,
+        ),
+        target_billable_hours: round2(rows.length * target),
+        target_attainment_percent: pct(shopApproved, rows.length * target),
+        utilization_percent: pct(shopApproved, shopAttendance),
+        project_coverage_percent: pct(shopProject, shopAttendance),
+        efficiency_percent: pct(shopApproved, shopProject),
+        approved_labor_value: round2(shopApproved * rate),
+      },
+      work_queue: {
+        unassigned_ready_count: unassignedReady.length,
+        unassigned_ready_hours: taskHours(unassignedReady),
+        blocked_count: blocked.length,
+        blocked_hours: taskHours(blocked),
+        waiting_count: waiting.length,
+        waiting_hours: taskHours(waiting),
+        in_progress_count: inProgress.length,
+        in_progress_hours: taskHours(inProgress),
+      },
+      technicians: rows,
+      boundary:
+        "Attendance, project work and approved billable hours remain separate sources. Open shifts are not counted as completed attendance. Labor value is approved billable hours multiplied by the configured shop rate; it is not an invoice, payment or accounting total.",
+    };
+  }
+    if (action === "timeline/add") {
     const v = await vehicleFor(m, id(b.vehicle_id)),
       p = b.project_id ? await projectFor(m, id(b.project_id)) : null;
     if (p && p.vehicle_id !== v.id) throw new Fault(400, "Project mismatch");
