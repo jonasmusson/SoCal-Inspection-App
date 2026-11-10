@@ -1108,6 +1108,11 @@ async function endpoint(
       throw new Fault(400, "Labor rate must be between 0 and 2000.");
     if (timezone.length < 3)
       throw new Fault(400, "Timezone is invalid.");
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
+    } catch {
+      throw new Fault(400, "Timezone is invalid.");
+    }
     const current = await one("hub_org_settings", `org_id=eq.${m.org_id}`),
       values = {
         weekly_billable_target: round2(target),
@@ -1163,7 +1168,8 @@ async function endpoint(
         `org_id=eq.${m.org_id}&status=neq.done&order=project_id.asc,sort_order.asc,created_at.asc&limit=5000`,
       ),
     ]);
-    const memberIds = members.map((x: any) => x.user_id),
+    const productionMembers = members.filter((x: any) => x.role !== "owner"),
+      memberIds = productionMembers.map((x: any) => x.user_id),
       profiles = memberIds.length
         ? await db(
             "user_profiles",
@@ -1173,7 +1179,7 @@ async function endpoint(
       profileById = new Map(profiles.map((x: any) => [x.id, x])),
       target = Number(settings.weekly_billable_target),
       rate = Number(settings.labor_rate),
-      rows = members.map((member: any) => {
+      rows = productionMembers.map((member: any) => {
         const personShifts = shifts.filter((x: any) => x.user_id === member.user_id),
           personEntries = entries.filter(
             (x: any) =>
