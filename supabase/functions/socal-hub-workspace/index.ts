@@ -2,7 +2,7 @@
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
-const VERSION = "0.11.1",
+const VERSION = "0.11.2",
   BUCKET = "hub-pilot-private",
   ARCHIVE = "hub-media-archive";
 const MIME: Record<string, string> = {
@@ -24,6 +24,8 @@ const CATEGORIES = [
   "Inspection",
   "Other",
 ];
+const PART_REQUEST_STATUSES = ["requested", "ordered", "received", "cancelled"];
+const PART_REQUEST_URGENCY = ["normal", "urgent"];
 const TASK_STATUSES = ["todo", "in_progress", "waiting", "blocked", "done"];
 const TASK_PRIORITIES = ["urgent", "high", "normal", "low"];
 const TASK_SKILLS = ["L1", "L2", "L2S", "L3", "F", "QA"];
@@ -381,6 +383,7 @@ async function endpoint(
       work_entries,
       project_tasks,
       member_task_skills,
+      parts_requests,
     ] = await Promise.all([
       db("hub_pilot_projects", scope + "&order=created_at.asc&limit=500"),
       db("hub_pilot_media", scope + "&order=created_at.desc&limit=500"),
@@ -410,6 +413,10 @@ async function endpoint(
         "hub_member_task_skills",
         `org_id=eq.${m.org_id}${m.role === "tech" ? "&user_id=eq." + m.user_id : ""}&order=user_id.asc,skill_code.asc`,
       ),
+      db(
+        "hub_parts_requests",
+        scope + "&order=created_at.desc&limit=2000",
+      ),
     ]);
     const techIds = [
         ...new Set(work_entries.map((x: any) => x.technician_user_id)),
@@ -435,11 +442,14 @@ async function endpoint(
       work_entries,
       project_tasks,
       member_task_skills,
+      parts_requests,
       work_profiles,
       work_systems: WORK_SYSTEMS,
       task_statuses: TASK_STATUSES,
       task_priorities: TASK_PRIORITIES,
       task_skills: TASK_SKILLS,
+      part_request_statuses: PART_REQUEST_STATUSES,
+      part_request_urgency: PART_REQUEST_URGENCY,
     };
   }
   if (action === "project/create") {
@@ -1000,6 +1010,112 @@ async function endpoint(
         })),
       );
     return { user_id: target, skill_codes: codes };
+  }
+
+  if (action === "parts/create") {
+    const p = await projectFor(m, id(b.project_id)),
+      task = b.task_id ? await taskFor(m, id(b.task_id)) : null,
+      partName = text(b.part_name, 300),
+      partNumber = text(b.part_number, 160),
+      quantity = Number(b.quantity ?? 1),
+      urgency = text(b.urgency || "normal", 20);
+    if (task && task.project_id !== p.id)
+      throw new Fault(400, "Task and project do not match.");
+    if (partName.length < 2) throw new Fault(400, "Part or material name required.");
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999)
+      throw new Fault(400, "Quantity must be between 1 and 999.");
+    if (!PART_REQUEST_URGENCY.includes(urgency))
+      throw new Fault(400, "Choose a valid parts-request urgency.");
+    return await db("hub_parts_requests", "", "POST", {
+      org_id: m.org_id,
+      vehicle_id: p.vehicle_id,
+      project_id: p.id,
+      task_id: task?.id || null,
+      requested_by: u.id,
+      updated_by: u.id,
+      part_name: partName,
+      part_number: partNumber,
+      quantity,
+      urgency,
+      status: "requested",
+      vendor: "",
+      order_reference: "",
+      notes: text(b.notes, 4000),
+      manager_note: "",
+    });
+  }
+  if (action === "parts/update") {
+    const request = await one(
+      "hub_parts_requests",
+      `id=eq.${id(b.id)}&org_id=eq.${m.org_id}`,
+    );
+    if (!request) throw new Fault(404, "Parts request unavailable.");
+    await projectFor(m, request.project_id);
+    const isManager = ["owner", "manager"].includes(m.role);
+    if (!isManager && (request.requested_by !== u.id || request.status !== "requested"))
+      throw new Fault(
+        403,
+        "Only management can change a parts request after it leaves Requested.",
+      );
+    const values: any = {
+      updated_by: u.id,
+      updated_at: new Date().toISOString(),
+    };
+    if ("part_name" in b) {
+      const partName = text(b.part_name, 300);
+      if (partName.length < 2) throw new Fault(400, "Part or material name required.");
+      values.part_name = partName;
+    }
+    if ("part_number" in b) values.part_number = text(b.part_number, 160);
+    if ("quantity" in b) {
+      const quantity = Number(b.quantity);
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999)
+        throw new Fault(400, "Quantity must be between 1 and 999.");
+      values.quantity = quantity;
+    }
+    if ("urgency" in b) {
+      const urgency = text(b.urgency, 20);
+      if (!PART_REQUEST_URGENCY.includes(urgency))
+        throw new Fault(400, "Choose a valid parts-request urgency.");
+      values.urgency = urgency;
+    }
+    if ("notes" in b) values.notes = text(b.notes, 4000);
+    if (isManager) {
+      if ("vendor" in b) values.vendor = text(b.vendor, 200);
+      if ("order_reference" in b)
+        values.order_reference = text(b.order_reference, 200);
+      if ("manager_note" in b)
+        values.manager_note = text(b.manager_note, 2000);
+      if ("status" in b) {
+        const status = text(b.status, 20),
+          now = new Date().toISOString();
+        if (!PART_REQUEST_STATUSES.includes(status))
+          throw new Fault(400, "Choose a valid parts-request status.");
+        values.status = status;
+        if (status === "requested") {
+          values.ordered_at = null;
+          values.received_at = null;
+        } else if (status === "ordered") {
+          values.ordered_at = request.ordered_at || now;
+          values.received_at = null;
+        } else if (status === "received") {
+          values.ordered_at = request.ordered_at || now;
+          values.received_at = request.received_at || now;
+        }
+      }
+    }
+    const rows = await db(
+      "hub_parts_requests",
+      `id=eq.${request.id}&org_id=eq.${m.org_id}${b.expected_updated_at ? "&updated_at=eq." + encodeURIComponent(b.expected_updated_at) : ""}`,
+      "PATCH",
+      values,
+    );
+    if (!rows.length)
+      throw new Fault(
+        409,
+        "This parts request changed on another device. Refresh before saving.",
+      );
+    return rows[0];
   }
   if (action === "timeline/add") {
     const v = await vehicleFor(m, id(b.vehicle_id)),
