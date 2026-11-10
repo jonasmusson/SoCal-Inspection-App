@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Mic, MicOff, RefreshCw, Save, WandSparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Mic, MicOff, RefreshCw, Save, Sparkles } from 'lucide-react';
 import { hubWorkspace, HubWorkspaceError } from '../lib/hubWorkspace';
 
 type Project = {
@@ -373,7 +373,7 @@ export function HubVoiceWorkPage() {
 
           <button type="button" onClick={() => void organizeWork()} disabled={busy || !transcript.trim() || !projectId}
             className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
-            {busy ? <RefreshCw className="h-5 w-5 animate-spin" /> : <WandSparkles className="h-5 w-5" />}
+            {busy ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
             Organize Work
           </button>
         </section>
