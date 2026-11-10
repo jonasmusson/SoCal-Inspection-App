@@ -3,7 +3,7 @@ import {createShopmonkeyWriteClient,ShopmonkeyWriteError} from "./shopmonkey.ts"
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
-const VERSION = "0.13.1",
+const VERSION = "0.13.2",
   BUCKET = "hub-pilot-private",
   ARCHIVE = "hub-media-archive";
 const MIME: Record<string, string> = {
@@ -46,6 +46,139 @@ const WORK_SYSTEMS = [
   "General",
   "Other",
 ];
+
+const openAiKey=()=>String(Deno.env.get("OPENAI_API_KEY")||"").trim();
+const WORK_DRAFT_FORMAT={
+  type:"json_schema",
+  name:"socal_hub_work_draft",
+  strict:true,
+  schema:{
+    type:"object",
+    additionalProperties:false,
+    properties:{
+      system:{type:"string",enum:["Engine","Transmission","Suspension","Brakes","Electrical","Body / Paint","Interior","Wheels / Tires","General","Other"]},
+      work_performed:{type:"string"},
+      actual_hours:{type:["number","null"]},
+      internal_notes:{type:"string"},
+      task_status_suggestion:{type:"string",enum:["no_change","done","blocked","waiting"]},
+      blocker_note:{type:"string"},
+      parts_requests:{
+        type:"array",
+        maxItems:10,
+        items:{
+          type:"object",
+          additionalProperties:false,
+          properties:{
+            part_name:{type:"string"},
+            part_number:{type:"string"},
+            quantity:{type:"integer"},
+            urgency:{type:"string",enum:["normal","urgent"]},
+            notes:{type:"string"}
+          },
+          required:["part_name","part_number","quantity","urgency","notes"]
+        }
+      },
+      warnings:{type:"array",maxItems:20,items:{type:"string"}}
+    },
+    required:["system","work_performed","actual_hours","internal_notes","task_status_suggestion","blocker_note","parts_requests","warnings"]
+  }
+} as const;
+
+async function readResponseTextWithinLimit(response:Response,maxBytes=250000){
+  const declared=response.headers.get("content-length");
+  if(declared){
+    const n=Number(declared);
+    if(Number.isFinite(n)&&n>maxBytes)throw new Error("AI response exceeded the safe boundary.");
+  }
+  const reader=response.body?.getReader();
+  if(!reader){
+    const raw=await response.text();
+    if(new TextEncoder().encode(raw).byteLength>maxBytes)throw new Error("AI response exceeded the safe boundary.");
+    return raw;
+  }
+  const decoder=new TextDecoder();
+  let total=0,raw="";
+  try{
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      total+=value.byteLength;
+      if(total>maxBytes){await reader.cancel();throw new Error("AI response exceeded the safe boundary.");}
+      raw+=decoder.decode(value,{stream:true});
+    }
+    return raw+decoder.decode();
+  }finally{reader.releaseLock();}
+}
+
+function responseOutputText(value:unknown){
+  const root=(value&&typeof value==="object"?value:{}) as Record<string,unknown>;
+  const output=Array.isArray(root.output)?root.output:[];
+  for(const item of output){
+    if(!item||typeof item!=="object")continue;
+    const content=Array.isArray((item as Record<string,unknown>).content)
+      ? (item as Record<string,unknown>).content as unknown[]
+      : [];
+    for(const part of content){
+      if(
+        part&&typeof part==="object"&&
+        (part as Record<string,unknown>).type==="output_text"&&
+        typeof (part as Record<string,unknown>).text==="string"
+      ) return (part as Record<string,unknown>).text as string;
+    }
+  }
+  throw new Error("AI response did not contain structured text.");
+}
+
+function validateWorkDraft(value:unknown){
+  const draft=(value&&typeof value==="object"?value:{}) as Record<string,unknown>,
+    system=text(draft.system,40),
+    performed=text(draft.work_performed,2000),
+    internalNotes=text(draft.internal_notes,2000),
+    status=text(draft.task_status_suggestion,20),
+    blocker=text(draft.blocker_note,1000);
+  if(!WORK_SYSTEMS.includes(system))throw new Error("AI returned an invalid system.");
+  if(performed.length<2)throw new Error("AI work description was empty.");
+  if(!["no_change","done","blocked","waiting"].includes(status))throw new Error("AI returned an invalid task suggestion.");
+  let actualHours:null|number=null;
+  if(draft.actual_hours!==null&&draft.actual_hours!==undefined){
+    const n=Number(draft.actual_hours);
+    if(!Number.isFinite(n)||n<=0||n>24)throw new Error("AI returned invalid hours.");
+    actualHours=Math.round(n*100)/100;
+  }
+  const parts=Array.isArray(draft.parts_requests)?draft.parts_requests:[];
+  if(parts.length>10)throw new Error("AI returned too many parts requests.");
+  const partDrafts=parts.map((raw)=>{
+    const row=(raw&&typeof raw==="object"?raw:{}) as Record<string,unknown>,
+      partName=text(row.part_name,300),
+      quantity=Number(row.quantity),
+      urgency=text(row.urgency,20);
+    if(partName.length<2)throw new Error("AI returned an invalid part name.");
+    if(!Number.isInteger(quantity)||quantity<1||quantity>999)throw new Error("AI returned an invalid part quantity.");
+    if(!PART_REQUEST_URGENCY.includes(urgency))throw new Error("AI returned an invalid part urgency.");
+    return {
+      part_name:partName,
+      part_number:text(row.part_number,160),
+      quantity,
+      urgency,
+      notes:text(row.notes,1000),
+    };
+  });
+  const warnings=(Array.isArray(draft.warnings)?draft.warnings:[])
+    .slice(0,20)
+    .map((warning)=>text(warning,500))
+    .filter(Boolean);
+  return {
+    system,
+    work_performed:performed,
+    actual_hours:actualHours,
+    internal_notes:internalNotes,
+    task_status_suggestion:status,
+    blocker_note:blocker,
+    parts_requests:partDrafts,
+    warnings,
+  };
+}
+
 class Fault extends Error {
   constructor(
     public status: number,
@@ -893,6 +1026,85 @@ async function endpoint(
       "PATCH",
       values,
     );
+  }
+
+
+  if (action === "work/draft/status") {
+    return {
+      configured:Boolean(openAiKey()),
+      mode:"review-first",
+      input:"transcript-text",
+    };
+  }
+  if (action === "work/draft") {
+    const p = await projectFor(m, id(b.project_id)),
+      task = b.task_id ? await taskFor(m, id(b.task_id)) : null,
+      transcript = text(b.transcript, 4000);
+    if (task && task.project_id !== p.id)
+      throw new Fault(400, "Task and project do not match.");
+    if (
+      m.role === "tech" &&
+      task &&
+      task.assigned_user_id &&
+      task.assigned_user_id !== u.id
+    )
+      throw new Fault(403, "This task is assigned to another technician.");
+    if (transcript.length < 2)
+      throw new Fault(400, "Dictate or type a work note first.");
+    const key=openAiKey();
+    if(!key)
+      throw new Fault(503,"Voice work drafting is not configured yet.");
+    const taskContext=task
+      ? \`Task: \${text(task.title,300)}. Current task status: \${text(task.status,30)}.\`
+      : "No specific whiteboard task was selected.";
+    const prompt=[
+      "Convert a technician's dictated shop note into a review-only SoCal HUB work draft.",
+      "Use only facts stated in the transcript and supplied project/task context. Never invent labor hours, part numbers, findings, completed work, task status, parts, customer promises or billing decisions.",
+      "If hours are not explicitly stated, actual_hours must be null.",
+      "work_performed should be a concise professional internal/shop invoice-style description that preserves the technician's meaning without adding facts.",
+      "internal_notes should contain useful factual detail that does not belong in the concise work-performed line; otherwise return an empty string.",
+      "Choose the closest system from the allowed enum. Use General if the system is genuinely unclear.",
+      "Only suggest done, blocked or waiting when the technician explicitly says the task is complete, blocked, or waiting. Otherwise use no_change.",
+      "Only create a parts request when the technician explicitly says a part/material is needed or requested. Never invent a part number. Default quantity to 1 only when a part is explicitly requested but quantity is not stated.",
+      "If wording, hours, parts or status are ambiguous, put a short explanation in warnings rather than guessing.",
+      \`Project: \${text(p.title,300)}.\`,
+      taskContext,
+      \`Technician transcript: \${transcript}\`,
+    ].join("\\n\\n");
+    try{
+      const response=await fetchSafe("https://api.openai.com/v1/responses",{
+        method:"POST",
+        headers:{Authorization:"Bearer "+key,"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"gpt-6-luna",
+          store:false,
+          reasoning:{effort:"low"},
+          max_output_tokens:2200,
+          instructions:"You are a conservative automotive shop work-entry drafting assistant. Return only the requested structured result and never imply that anything was saved, approved or billed.",
+          input:prompt,
+          text:{format:WORK_DRAFT_FORMAT},
+        }),
+      });
+      if(!response.ok){
+        console.error("HUB work draft AI failed",response.status);
+        throw new Fault(502,"Voice work drafting could not complete. Keep the transcript and retry.");
+      }
+      const payload:unknown=JSON.parse(await readResponseTextWithinLimit(response)),
+        parsed:unknown=JSON.parse(responseOutputText(payload)),
+        draft=validateWorkDraft(parsed);
+      return {
+        draft,
+        transcript,
+        model:"gpt-6-luna",
+        review_required:true,
+        saved:false,
+        boundary:"Draft only. Nothing was added to project work, task status, Parts Requests, Timecards or Shopmonkey.",
+      };
+    }catch(error){
+      if(error instanceof Fault)throw error;
+      console.error("HUB work draft AI error",error instanceof Error?error.name:"unknown");
+      throw new Fault(502,"Voice work drafting could not complete. Keep the transcript and retry.");
+    }
   }
 
   if (action === "work-session/start") {
