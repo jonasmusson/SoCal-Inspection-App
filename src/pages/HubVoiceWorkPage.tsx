@@ -107,7 +107,64 @@ function speechConstructor(): SpeechRecognitionConstructor | null {
   return candidate.SpeechRecognition ?? candidate.webkitSpeechRecognition ?? null;
 }
 
-export function HubVoiceWorkPage() {
+const DEMO_USER_ID = 'demo-tech';
+
+const DEMO_SNAPSHOT: Snapshot = {
+  member: { user_id: DEMO_USER_ID, role: 'tech' },
+  projects: [
+    { id: 'demo-project-brakes', vehicle_id: 'demo-vehicle-camaro', title: 'Brake & Road Test', status: 'active' },
+    { id: 'demo-project-trailer', vehicle_id: 'demo-vehicle-trailer', title: 'Shop Trailer Improvements', status: 'active' },
+  ],
+  vehicles: [
+    { id: 'demo-vehicle-camaro', display_name: '1968 Camaro RS', year: 1968, make: 'Chevrolet', model: 'Camaro RS' },
+    { id: 'demo-vehicle-trailer', display_name: 'SoCal Shop Trailer', year: null, make: 'SoCal', model: 'Shop Trailer' },
+  ],
+  project_tasks: [
+    { id: 'demo-task-brakes', project_id: 'demo-project-brakes', assigned_user_id: DEMO_USER_ID, title: 'Inspect front brakes', status: 'in_progress', skill_code: 'L2' },
+    { id: 'demo-task-roadtest', project_id: 'demo-project-brakes', assigned_user_id: DEMO_USER_ID, title: 'Road test after repair', status: 'todo', skill_code: 'L2' },
+    { id: 'demo-task-trailer', project_id: 'demo-project-trailer', assigned_user_id: DEMO_USER_ID, title: 'Repair interior lighting', status: 'todo', skill_code: 'L2' },
+  ],
+  work_systems: ['Engine','Transmission','Suspension','Brakes','Electrical','Body / Paint','Interior','Wheels / Tires','General','Other'],
+};
+
+const DEMO_EXAMPLE =
+  'Pulled the left front brake apart and inspected the caliper and hose. The caliper looks okay but the brake hose is cracked and needs replacement. Cleaned everything up and reassembled it for now. I have about 1.5 hours into it and the task is blocked until the hose arrives.';
+
+function demoDraftFromTranscript(transcript: string): WorkDraft {
+  const lower = transcript.toLowerCase();
+  const hourMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)/);
+  const actualHours = hourMatch ? Math.min(24, Math.max(0.1, Number(hourMatch[1]))) : null;
+  const system =
+    /brake|caliper|rotor|hose/.test(lower) ? 'Brakes' :
+    /wire|wiring|electrical|light|battery|voltage/.test(lower) ? 'Electrical' :
+    /engine|motor|oil|coolant|carb|efi|fuel/.test(lower) ? 'Engine' :
+    /transmission|trans|shift|clutch/.test(lower) ? 'Transmission' :
+    /suspension|shock|spring|control arm|tie rod/.test(lower) ? 'Suspension' :
+    /interior|seat|carpet|dash|headliner/.test(lower) ? 'Interior' :
+    /wheel|tire/.test(lower) ? 'Wheels / Tires' : 'General';
+  const blocked = /blocked|cannot finish|can't finish|waiting for|until .* arrives/.test(lower);
+  const waiting = !blocked && /waiting|on hold/.test(lower);
+  const done = !blocked && !waiting && /finished|complete|completed|done/.test(lower);
+  const parts: PartDraft[] = [];
+  if (/brake hose/.test(lower) && /need|needs|replacement|replace/.test(lower)) {
+    parts.push({ part_name: 'Brake hose', part_number: '', quantity: 1, urgency: 'normal', notes: 'Verify exact application before ordering.' });
+  }
+  return {
+    system,
+    work_performed: transcript.trim(),
+    actual_hours: actualHours,
+    internal_notes: '',
+    task_status_suggestion: blocked ? 'blocked' : waiting ? 'waiting' : done ? 'done' : 'no_change',
+    blocker_note: blocked ? 'Work cannot be completed until the stated blocker is resolved.' : '',
+    parts_requests: parts,
+    warnings: [
+      'Demo organizer only — this is for UX testing and is not the production AI interpretation.',
+      ...(actualHours === null ? ['No explicit labor hours were detected.'] : []),
+    ],
+  };
+}
+
+export function HubVoiceWorkPage({ demoMode = false }: { demoMode?: boolean }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [projectId, setProjectId] = useState('');
   const [taskId, setTaskId] = useState('');
@@ -139,6 +196,12 @@ export function HubVoiceWorkPage() {
 
   async function load() {
     setError('');
+    if (demoMode) {
+      setSnapshot(DEMO_SNAPSHOT);
+      setProjectId(current => current || DEMO_SNAPSHOT.projects[0].id);
+      setDraftConfigured(true);
+      return;
+    }
     try {
       const data = await hubWorkspace<Snapshot>('snapshot');
       setSnapshot(data);
@@ -229,6 +292,14 @@ export function HubVoiceWorkPage() {
     setBusy(true);
     setError('');
     setMessage('');
+    if (demoMode) {
+      window.setTimeout(() => {
+        setDraft(demoDraftFromTranscript(transcript.trim()));
+        setMessage('Demo draft organized. Review and edit it exactly as you would in the live workflow.');
+        setBusy(false);
+      }, 250);
+      return;
+    }
     try {
       const response = await hubWorkspace<DraftResponse>('work/draft', {
         method: 'POST',
@@ -253,6 +324,11 @@ export function HubVoiceWorkPage() {
 
   async function saveWork() {
     if (!draft || !projectId) return;
+    if (demoMode) {
+      setError('');
+      setMessage('Demo only — nothing was saved, approved, billed, or sent anywhere.');
+      return;
+    }
     if (!draft.actual_hours || draft.actual_hours <= 0) {
       setError('Enter actual project hours before saving.');
       return;
@@ -287,7 +363,10 @@ export function HubVoiceWorkPage() {
     <div className="min-h-full bg-[#f4f3ee] px-4 py-5 pb-28">
       <div className="mx-auto max-w-2xl space-y-4">
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-800">SoCal Workshop · Add Work</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-800">SoCal Workshop · Add Work</p>
+            {demoMode && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-900">Review Demo · No Writes</span>}
+          </div>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-stone-950">Talk it. Check it. Save it.</h1>
           <p className="mt-2 text-sm leading-6 text-stone-600">
             Speak naturally about what you did. The HUB will organize the note, but you review the result before anything is saved.
@@ -356,6 +435,13 @@ export function HubVoiceWorkPage() {
               {listening ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
             </button>
           </div>
+
+          {demoMode && (
+            <button type="button" onClick={() => { setTranscript(DEMO_EXAMPLE); setDraft(null); setMessage('Sample note loaded. Edit it or replace it with your own dictation.'); }}
+              className="mt-4 min-h-11 rounded-xl border border-stone-300 bg-stone-50 px-4 text-sm font-semibold text-stone-700">
+              Load sample shop note
+            </button>
+          )}
 
           <textarea value={transcript} onChange={event => { setTranscript(event.target.value); setDraft(null); }}
             rows={7}
@@ -456,9 +542,11 @@ export function HubVoiceWorkPage() {
             <button type="button" onClick={() => void saveWork()} disabled={busy || !draft.work_performed.trim() || !draft.actual_hours}
               className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-900 px-4 font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
               <Save className="h-5 w-5" />
-              Save Work · Pending Review
+              {demoMode ? 'Demo Save · No Write' : 'Save Work · Pending Review'}
             </button>
-            <p className="mt-2 text-center text-xs text-stone-500">Saving creates project work only. It does not bill the customer or send anything to Shopmonkey.</p>
+            <p className="mt-2 text-center text-xs text-stone-500">
+              {demoMode ? 'Review demo only. This button cannot write to the HUB.' : 'Saving creates project work only. It does not bill the customer or send anything to Shopmonkey.'}
+            </p>
           </section>
         )}
       </div>
