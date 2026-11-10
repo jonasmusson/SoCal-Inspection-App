@@ -148,7 +148,7 @@ export function PremiumInspectionReport({
             ['Report date', reportDate],
           ].map(([label, value], index) => <div key={label} className={`px-3 py-4 ${index % 2 === 0 ? 'border-r' : ''} border-[#bbb29f] sm:border-r sm:last:border-r-0`}><p className="text-[8px] font-black uppercase tracking-[.18em] text-stone-500">{label}</p><p className="mt-1 text-xs font-bold sm:text-sm">{value}</p></div>)}
         </div>
-        <nav className="mt-5 grid grid-cols-5 text-[8px] font-black uppercase tracking-[.12em] text-stone-500 sm:text-[9px]"><span>01 Summary</span><span>02 Condition</span><span>03 Priorities</span><span>04 Findings</span><span>05 Plan</span></nav>
+        <nav className="mt-5 grid grid-cols-4 gap-y-1 text-[8px] font-black uppercase tracking-[.12em] text-stone-500 sm:grid-cols-7 sm:text-[9px]"><span>01 Summary</span><span>02 Condition</span><span>03 Priorities</span><span>04 Findings</span><span>05 Full Record</span><span>06 Check-In</span><span>07 Plan</span></nav>
       </header>
 
       <main>
@@ -245,7 +245,7 @@ export function PremiumInspectionReport({
                         ['Recommended next step', item.recommended_action || 'Review with your advisor and include it in the appropriate repair phase.'],
                       ].map(([label, copy]) => <div key={label} className="border-b border-r border-[#d4cebf] p-4"><p className="text-[8px] font-black uppercase tracking-[.14em]" style={{ color: GOLD }}>{label}</p><p className="mt-2 text-xs leading-5 text-stone-600">{copy}</p></div>)}
                     </div>
-                    {itemPhotos.length ? <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{itemPhotos.map((photo, photoIndex) => <figure key={photo.id} className="overflow-hidden border border-[#d4cebf] bg-white"><img src={photo.photo_url} alt={`${item.item_name} evidence ${photoIndex + 1}`} className="h-32 w-full object-cover" /><figcaption className="px-2 py-1.5 text-[8px] font-bold uppercase tracking-[.1em] text-stone-500">Evidence {photoIndex + 1}</figcaption></figure>)}</div> : <div className="mt-3 border border-dashed border-[#c7bfaf] px-4 py-5 text-[9px] font-bold uppercase tracking-[.14em] text-stone-400">No evidence photo attached</div>}
+                    {itemPhotos.length ? <div className="mt-3"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{itemPhotos.slice(0, 3).map((photo, photoIndex) => <figure key={photo.id} className="overflow-hidden border border-[#d4cebf] bg-white"><img src={photo.photo_url} alt={`${item.item_name} evidence ${photoIndex + 1}`} className="h-32 w-full object-cover" /><figcaption className="px-2 py-1.5 text-[8px] font-bold uppercase tracking-[.1em] text-stone-500">Evidence {photoIndex + 1}</figcaption></figure>)}</div>{itemPhotos.length > 3 && <p className="mt-2 text-[9px] font-bold uppercase tracking-[.1em] text-stone-400">+ {itemPhotos.length - 3} additional photo{itemPhotos.length - 3 === 1 ? '' : 's'} in Complete Inspection Record</p>}</div> : <div className="mt-3 border border-dashed border-[#c7bfaf] px-4 py-5 text-[9px] font-bold uppercase tracking-[.14em] text-stone-400">No evidence photo attached</div>}
                   </div>
                 </div>
               </article>;
