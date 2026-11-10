@@ -8,6 +8,8 @@ export function CameraView({ onCapture }: { onCapture: (file: File) => void }) {
   const streamRef = useRef<MediaStream | null>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [error, setError] = useState(false);
+  const [acceptingVideo, setAcceptingVideo] = useState(false);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
 
   useEffect(() => {
     navigator.mediaDevices
@@ -74,7 +76,7 @@ export function CameraView({ onCapture }: { onCapture: (file: File) => void }) {
 // ─── Video Recorder ───────────────────────────────────────────────────────────
 
 interface VideoRecorderProps {
-  onCapture: (file: File) => void;
+  onCapture: (file: File) => void | Promise<void>;
   onClose: () => void;
   title?: string;
 }
@@ -158,11 +160,20 @@ export function VideoRecorderView({ onCapture, onClose, title = 'Record Video' }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }
 
-  function useVideo() {
-    if (!previewBlob) return;
-    const ext = previewBlob.type.includes('mp4') ? 'mp4' : 'webm';
-    const file = new File([previewBlob], `video-${Date.now()}.${ext}`, { type: previewBlob.type });
-    onCapture(file);
+  async function useVideo() {
+    if (!previewBlob || acceptingVideo) return;
+    setAcceptingVideo(true);
+    setHandoffError(null);
+    try {
+      const mime = previewBlob.type || 'video/webm';
+      const ext = mime.includes('mp4') || mime.includes('quicktime') ? 'mp4' : 'webm';
+      const file = new File([previewBlob], `video-${Date.now()}.${ext}`, { type: mime });
+      await onCapture(file);
+    } catch (err) {
+      console.error('Video handoff failed:', err);
+      setHandoffError('The video is still on this preview. It could not be attached to the check-in yet. Try Use Video again or choose Re-record.');
+      setAcceptingVideo(false);
+    }
   }
 
   function reRecord() {
@@ -199,12 +210,19 @@ export function VideoRecorderView({ onCapture, onClose, title = 'Record Video' }
               <X className="w-5 h-5" /> Re-record
             </button>
             <button
-              onClick={useVideo}
-              className="flex-1 py-3.5 rounded-xl bg-success-600 hover:bg-success-700 text-white font-semibold flex items-center justify-center gap-2"
+              type="button"
+              onClick={() => void useVideo()}
+              disabled={acceptingVideo}
+              className="flex-1 py-3.5 rounded-xl bg-success-600 hover:bg-success-700 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              <Check className="w-5 h-5" /> Use Video
+              <Check className="w-5 h-5" /> {acceptingVideo ? 'Saving Video…' : 'Use Video'}
             </button>
           </div>
+          {handoffError && (
+            <div className="bg-black px-5 pb-4 text-center text-xs text-red-300">
+              {handoffError}
+            </div>
+          )}
         </>
       ) : (
         <>
