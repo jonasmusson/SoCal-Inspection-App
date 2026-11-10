@@ -8,8 +8,6 @@ export function CameraView({ onCapture }: { onCapture: (file: File) => void }) {
   const streamRef = useRef<MediaStream | null>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [error, setError] = useState(false);
-  const [acceptingVideo, setAcceptingVideo] = useState(false);
-  const [handoffError, setHandoffError] = useState<string | null>(null);
 
   useEffect(() => {
     navigator.mediaDevices
@@ -94,6 +92,8 @@ export function VideoRecorderView({ onCapture, onClose, title = 'Record Video' }
   const [duration, setDuration] = useState(0);
   const [cameraReady, setCameraReady] = useState(false);
   const [error, setError] = useState(false);
+  const [acceptingVideo, setAcceptingVideo] = useState(false);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
 
   useEffect(() => {
     startCamera();
@@ -160,7 +160,7 @@ export function VideoRecorderView({ onCapture, onClose, title = 'Record Video' }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }
 
-  async function useVideo() {
+  async function acceptVideo() {
     if (!previewBlob || acceptingVideo) return;
     setAcceptingVideo(true);
     setHandoffError(null);
@@ -211,7 +211,7 @@ export function VideoRecorderView({ onCapture, onClose, title = 'Record Video' }
             </button>
             <button
               type="button"
-              onClick={() => void useVideo()}
+              onClick={() => void acceptVideo()}
               disabled={acceptingVideo}
               className="flex-1 py-3.5 rounded-xl bg-success-600 hover:bg-success-700 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
