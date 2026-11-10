@@ -2976,7 +2976,7 @@ if (action === "timeclock/punch") {
   if (action === "management/review-queue") {
     management(m);
     const now = new Date(),
-      [pendingWork, readyWork, tasks, parts, openShifts, inspectionLinks, projectLinks] =
+      [pendingWork, readyWork, tasks, parts, openShifts, inspectionLinks, projectLinks, pendingCapacity] =
         await Promise.all([
           db(
             "hub_work_entries",
@@ -3005,6 +3005,10 @@ if (action === "timeclock/punch") {
           db(
             "hub_shopmonkey_project_links",
             `org_id=eq.${m.org_id}&order=verified_at.desc&limit=1000`,
+          ),
+          db(
+            "hub_capacity_entries",
+            `org_id=eq.${m.org_id}&review_status=eq.pending_review&order=work_date.asc,created_at.asc&limit=1000`,
           ),
         ]),
       inspectionIds = inspectionLinks.map((row:any)=>row.inspection_id),
@@ -3036,6 +3040,7 @@ if (action === "timeclock/punch") {
             ...tasks.map((row:any)=>row.project_id),
             ...parts.map((row:any)=>row.project_id),
             ...pendingInspections.map((row:any)=>row.project_id),
+            ...pendingCapacity.map((row:any)=>row.project_id),
           ].filter(Boolean),
         ),
       ],
@@ -3061,6 +3066,7 @@ if (action === "timeclock/punch") {
             ...readyWork.map((row:any)=>row.technician_user_id),
             ...parts.map((row:any)=>row.requested_by),
             ...openShifts.map((row:any)=>row.user_id),
+            ...pendingCapacity.map((row:any)=>row.technician_user_id),
           ].filter(Boolean),
         ),
       ],
@@ -3117,6 +3123,17 @@ if (action === "timeclock/punch") {
         ...row,
         ...projectMeta(row.project_id),
       })),
+      capacityRows = pendingCapacity.map((row:any)=>({
+        ...row,
+        ...(row.project_id ? projectMeta(row.project_id) : {
+          project_title:"",
+          project_status:"",
+          vehicle_name:"",
+          shopmonkey_order_ref:"",
+          shopmonkey_linked:false,
+        }),
+        technician_name:personName(row.technician_user_id),
+      })),
       sumHours=(rows:any[],field:string)=>
         Math.round(
           rows.reduce((sum,row)=>sum+Number(row[field]||0),0)*100,
@@ -3134,6 +3151,7 @@ if (action === "timeclock/punch") {
         open_timecards:openShiftRows.length,
         stale_open_timecards:openShiftRows.filter((row:any)=>row.needs_manager_attention).length,
         inspections_pending_review:inspectionRows.length,
+        capacity_pending_review:capacityRows.length,
       },
       hours:{
         pending_project_hours:sumHours(pendingWorkRows,"actual_hours"),
@@ -3141,6 +3159,7 @@ if (action === "timeclock/punch") {
         unassigned_ready_hours:sumHours(unassignedTasks,"estimated_hours"),
         blocked_hours:sumHours(blockedTasks,"estimated_hours"),
         waiting_hours:sumHours(waitingTasks,"estimated_hours"),
+        capacity_pending_review_hours:sumHours(capacityRows,"hours"),
       },
       pending_work:pendingWorkRows,
       ready_for_shopmonkey:readyWorkRows,
@@ -3151,8 +3170,9 @@ if (action === "timeclock/punch") {
       parts_requests:partsRows,
       open_timecards:openShiftRows,
       inspections_pending_review:inspectionRows,
+      capacity_pending_review:capacityRows,
       boundary:
-        "Review queue is read-only. It does not approve work, assign tasks, change parts status, approve inspections, edit Timecards or write to Shopmonkey.",
+        "Review queue is read-only. It does not approve work or capacity credit, assign tasks, change parts status, approve inspections, edit Timecards or write to Shopmonkey.",
     };
   }
 
