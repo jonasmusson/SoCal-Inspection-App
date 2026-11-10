@@ -15,6 +15,7 @@ test("Workshop OS integration exposes one combined project snapshot",()=>{
     "shopmonkey_project_links",
     "shopmonkey_work_links",
     "timecards",
+    "work_sessions",
   ]) assert.ok(source.includes(text),text);
 });
 
@@ -26,6 +27,12 @@ test("Workshop OS keeps planning, work, attendance, parts, inspection and billin
     'action === "work/update"',
     'action === "timeclock/punch"',
     'action === "timecard/update"',
+    'action === "work-session/start"',
+    'action === "work-session/stop"',
+    'action === "work/draft"',
+    'action === "tech/home"',
+    'action === "task/claim"',
+    'action === "management/review-queue"',
     'action === "parts/create"',
     'action === "parts/update"',
     'action === "inspection/start"',
@@ -66,6 +73,7 @@ test("Workshop OS review SQL covers every new durable module before production m
     "supabase/review-sql/hub-project-tasks-v1.sql",
     "supabase/review-sql/hub-member-task-skills-v1.sql",
     "supabase/review-sql/hub-timecards-v1.sql",
+    "supabase/review-sql/hub-work-sessions-v1.sql",
     "supabase/review-sql/hub-org-settings-productivity-v1.sql",
     "supabase/review-sql/hub-parts-requests-v1.sql",
     "supabase/review-sql/hub-clipboard-apply-v1.sql",
@@ -78,4 +86,19 @@ test("Combined backend is still review-first and does not auto-sync Shopmonkey f
   assert.ok(work.includes('status: "pending_review"'));
   assert.ok(!work.includes("shopmonkeyClient"));
   assert.ok(!work.includes("hub_shopmonkey_sync_runs"));
+});
+
+
+test("Workshop OS v2 keeps voice and dashboards review/read-only around canonical work entries",()=>{
+  const source=read("supabase/functions/socal-hub-workspace/index.ts");
+  const draft=source.slice(source.indexOf('if (action === "work/draft")'),source.indexOf('if (action === "work-session/start")'));
+  assert.ok(draft.includes("review_required:true"));
+  assert.ok(draft.includes("saved:false"));
+  assert.ok(!draft.includes('db("hub_work_entries"'));
+
+  const queue=source.slice(source.indexOf('if (action === "management/review-queue")'),source.indexOf('if (action === "timeline/add")'));
+  for(const mutator of ['"PATCH"','"POST"','"DELETE"'])assert.ok(!queue.includes(mutator),mutator);
+
+  const home=source.slice(source.indexOf('if (action === "tech/home")'),source.indexOf('if (action === "task/claim")'));
+  assert.ok(home.includes("assignment-scoped shop work only"));
 });
