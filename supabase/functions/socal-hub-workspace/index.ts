@@ -1245,7 +1245,7 @@ async function endpoint(
       );
     const existing = await one(
       "hub_shopmonkey_project_links",
-      \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}\`,
+      `project_id=eq.${p.id}&org_id=eq.${m.org_id}`,
     );
     const values = {
       org_id: m.org_id,
@@ -1259,7 +1259,7 @@ async function endpoint(
     const rows = existing
       ? await db(
           "hub_shopmonkey_project_links",
-          \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}\`,
+          `project_id=eq.${p.id}&org_id=eq.${m.org_id}`,
           "PATCH",
           values,
         )
@@ -1284,7 +1284,7 @@ async function endpoint(
     const p = await projectFor(m, id(url.searchParams.get("project_id"))),
       link = await one(
         "hub_shopmonkey_project_links",
-        \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}\`,
+        `project_id=eq.${p.id}&org_id=eq.${m.org_id}`,
       );
     if (!link)
       throw new Fault(409, "Verify the Shopmonkey Order ID for this project first.");
@@ -1305,13 +1305,13 @@ async function endpoint(
       throw new Fault(409, "This Shopmonkey order is read-only.");
     const entries = await db(
         "hub_work_entries",
-        \`org_id=eq.\${m.org_id}&project_id=eq.\${p.id}&status=eq.approved&invoice_state=eq.ready&order=work_date.asc,created_at.asc&limit=1000\`,
+        `org_id=eq.${m.org_id}&project_id=eq.${p.id}&status=eq.approved&invoice_state=eq.ready&order=work_date.asc,created_at.asc&limit=1000`,
       ),
       entryIds = entries.map((x:any) => x.id),
       linked = entryIds.length
         ? await db(
             "hub_shopmonkey_work_links",
-            \`org_id=eq.\${m.org_id}&work_entry_id=in.(\${entryIds.join(",")})\`,
+            `org_id=eq.${m.org_id}&work_entry_id=in.(${entryIds.join(",")})`,
           )
         : [],
       linkedIds = new Set(linked.map((x:any) => x.work_entry_id)),
@@ -1367,7 +1367,7 @@ async function endpoint(
       p = await projectFor(m, id(b.project_id)),
       link = await one(
         "hub_shopmonkey_project_links",
-        \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}\`,
+        `project_id=eq.${p.id}&org_id=eq.${m.org_id}`,
       ),
       rateCents = Number(b.rate_cents),
       requestedIds = Array.isArray(b.work_entry_ids)
@@ -1388,7 +1388,7 @@ async function endpoint(
       payloadHash = await sha(new TextEncoder().encode(payloadText).buffer),
       existingRun = await one(
         "hub_shopmonkey_sync_runs",
-        \`id=eq.\${requestId}&org_id=eq.\${m.org_id}\`,
+        `id=eq.${requestId}&org_id=eq.${m.org_id}`,
       );
     if (existingRun) {
       if (
@@ -1405,13 +1405,13 @@ async function endpoint(
     }
     const entries = await db(
       "hub_work_entries",
-      \`org_id=eq.\${m.org_id}&project_id=eq.\${p.id}&id=in.(\${requestedIds.join(",")})\`,
+      `org_id=eq.${m.org_id}&project_id=eq.${p.id}&id=in.(${requestedIds.join(",")})`,
     );
     if (entries.length !== requestedIds.length)
       throw new Fault(400, "One or more selected work entries are unavailable.");
     const existingLinks = await db(
       "hub_shopmonkey_work_links",
-      \`org_id=eq.\${m.org_id}&work_entry_id=in.(\${requestedIds.join(",")})\`,
+      `org_id=eq.${m.org_id}&work_entry_id=in.(${requestedIds.join(",")})`,
     );
     if (existingLinks.length)
       throw new Fault(409, "One or more selected work entries are already linked to Shopmonkey labor.");
@@ -1467,7 +1467,7 @@ async function endpoint(
       for (const [system, rows] of bySystem.entries()) {
         let serviceLink = await one(
           "hub_shopmonkey_service_links",
-          \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}&system=eq.\${encodeURIComponent(system)}\`,
+          `project_id=eq.${p.id}&org_id=eq.${m.org_id}&system=eq.${encodeURIComponent(system)}`,
         );
         if (serviceLink && serviceLink.remote_order_id !== link.remote_order_id)
           throw new Error("Stored Shopmonkey service mapping belongs to a different order.");
@@ -1518,7 +1518,7 @@ async function endpoint(
           });
           const updated = await db(
             "hub_work_entries",
-            \`id=eq.\${entry.id}&org_id=eq.\${m.org_id}&invoice_state=eq.ready\`,
+            `id=eq.${entry.id}&org_id=eq.${m.org_id}&invoice_state=eq.ready`,
             "PATCH",
             {
               invoice_state: "synced",
@@ -1548,7 +1548,7 @@ async function endpoint(
       };
       await db(
         "hub_shopmonkey_sync_runs",
-        \`id=eq.\${requestId}&org_id=eq.\${m.org_id}\`,
+        `id=eq.${requestId}&org_id=eq.${m.org_id}`,
         "PATCH",
         {
           status: "complete",
@@ -1573,11 +1573,11 @@ async function endpoint(
     } catch (error) {
       const savedLinks = await db(
         "hub_shopmonkey_work_links",
-        \`org_id=eq.\${m.org_id}&sync_run_id=eq.\${requestId}\`,
+        `org_id=eq.${m.org_id}&sync_run_id=eq.${requestId}`,
       );
       await db(
         "hub_shopmonkey_sync_runs",
-        \`id=eq.\${requestId}&org_id=eq.\${m.org_id}\`,
+        `id=eq.${requestId}&org_id=eq.${m.org_id}`,
         "PATCH",
         {
           status: savedLinks.length ? "partial" : "failed",
