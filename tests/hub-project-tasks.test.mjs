@@ -23,7 +23,7 @@ test("Project Whiteboard schema is relational and project-scoped",()=>{
 
 test("HUB snapshot exposes project tasks and task dictionaries",()=>{
   const source=read("supabase/functions/socal-hub-workspace/index.ts");
-  assert.match(source,/const VERSION = "\\d+\\.\\d+\\.\\d+"/);
+  assert.ok(source.includes('const VERSION = "0.'));
   for(const text of [
     '"hub_project_tasks"',
     "project_tasks",
