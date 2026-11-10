@@ -185,18 +185,26 @@ async function assertTaskSkill(m: any, userId: string, skillCode: string) {
       "Assigned technician is not approved for this task level.",
     );
 }
-async function assertTechnicalSupervisor(m: any, userId: string) {
+async function assertTechnicalSupervisor(
+  m: any,
+  userId: string,
+  vehicleId: string,
+) {
   const member = await activeMemberFor(m, userId);
   if (["owner", "manager"].includes(member.role)) return;
-  if (
+  const technicallyApproved =
     (await skillFor(m, userId, "L3")) ||
-    (await skillFor(m, userId, "QA"))
-  )
-    return;
-  throw new Fault(
-    400,
-    "Supervisor must be management or approved for L3 / QA work.",
-  );
+    (await skillFor(m, userId, "QA"));
+  if (!technicallyApproved)
+    throw new Fault(
+      400,
+      "Supervisor must be management or approved for L3 / QA work.",
+    );
+  if (!(await assignmentFor(m, vehicleId, userId)))
+    throw new Fault(
+      400,
+      "Technical supervisor must have access to this vehicle.",
+    );
 }
 async function inspectionFor(m: any, pid: string) {
   const p = await projectFor(m, pid),
@@ -372,6 +380,7 @@ async function endpoint(
       profile,
       work_entries,
       project_tasks,
+      member_task_skills,
     ] = await Promise.all([
       db("hub_pilot_projects", scope + "&order=created_at.asc&limit=500"),
       db("hub_pilot_media", scope + "&order=created_at.desc&limit=500"),
@@ -397,6 +406,10 @@ async function endpoint(
         "hub_project_tasks",
         scope + "&order=project_id.asc,sort_order.asc,created_at.asc&limit=2000",
       ),
+      db(
+        "hub_member_task_skills",
+        `org_id=eq.${m.org_id}${m.role === "tech" ? "&user_id=eq." + m.user_id : ""}&order=user_id.asc,skill_code.asc`,
+      ),
     ]);
     const techIds = [
         ...new Set(work_entries.map((x: any) => x.technician_user_id)),
@@ -421,6 +434,7 @@ async function endpoint(
       contacts,
       work_entries,
       project_tasks,
+      member_task_skills,
       work_profiles,
       work_systems: WORK_SYSTEMS,
       task_statuses: TASK_STATUSES,
@@ -490,7 +504,7 @@ async function endpoint(
     }
     if (b.supervisor_user_id) {
       supervisor = id(b.supervisor_user_id);
-      await assertTechnicalSupervisor(m, supervisor);
+      await assertTechnicalSupervisor(m, supervisor, p.vehicle_id);
     }
     if (skill === "L2S" && !supervisor)
       throw new Fault(400, "Supervised mechanical tasks require a supervisor.");
@@ -549,8 +563,6 @@ async function endpoint(
           throw new Fault(400, "Choose a valid technician level.");
         if (task.assigned_user_id)
           await assertTaskSkill(m, task.assigned_user_id, skill);
-        if (skill === "L2S" && !(values.supervisor_user_id ?? task.supervisor_user_id))
-          throw new Fault(400, "Supervised mechanical tasks require a supervisor.");
         values.skill_code = skill;
       }
       if ("estimated_hours" in b) {
@@ -574,7 +586,7 @@ async function endpoint(
         if (!b.supervisor_user_id) values.supervisor_user_id = null;
         else {
           const supervisor = id(b.supervisor_user_id);
-          await assertTechnicalSupervisor(m, supervisor);
+          await assertTechnicalSupervisor(m, supervisor, task.vehicle_id);
           values.supervisor_user_id = supervisor;
         }
       }
@@ -935,6 +947,59 @@ async function endpoint(
         "This work entry changed on another device. Refresh before saving.",
       );
     return rows[0];
+  }
+
+  if (action === "capabilities/list") {
+    management(m);
+    const members = await db(
+      "hub_pilot_members",
+      `org_id=eq.${m.org_id}&active=eq.true&order=created_at.asc`,
+    );
+    const skills = await db(
+      "hub_member_task_skills",
+      `org_id=eq.${m.org_id}&order=user_id.asc,skill_code.asc`,
+    );
+    const ids = members.map((x: any) => x.user_id);
+    const profiles = ids.length
+      ? await db(
+          "user_profiles",
+          `id=in.(${ids.join(",")})&select=id,full_name,email`,
+        )
+      : [];
+    return { members, profiles, skills, skill_codes: TASK_SKILLS };
+  }
+  if (action === "capabilities/set") {
+    management(m, true);
+    const target = id(b.user_id),
+      member = await activeMemberFor(m, target),
+      codes = Array.isArray(b.skill_codes)
+        ? [...new Set(b.skill_codes.map((x: unknown) => text(x, 10)))]
+        : [];
+    if (member.role === "owner" && target === u.id && !codes.length)
+      throw new Fault(400, "Keep at least one task capability on your own active profile.");
+    if (codes.some((code) => !TASK_SKILLS.includes(code)))
+      throw new Fault(400, "One or more task capability codes are invalid.");
+    await db(
+      "hub_member_task_skills",
+      `org_id=eq.${m.org_id}&user_id=eq.${target}`,
+      "DELETE",
+    );
+    if (codes.length)
+      await db(
+        "hub_member_task_skills",
+        "",
+        "POST",
+        codes.map((skill_code) => ({
+          org_id: m.org_id,
+          user_id: target,
+          skill_code,
+          notes: "",
+          approved_by: u.id,
+          approved_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })),
+      );
+    return { user_id: target, skill_codes: codes };
   }
   if (action === "timeline/add") {
     const v = await vehicleFor(m, id(b.vehicle_id)),
