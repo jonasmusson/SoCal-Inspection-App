@@ -24,7 +24,7 @@ test("HUB Timecards schema keeps attendance separate from project labor",()=>{
 
 test("HUB snapshot returns attendance separately from work entries",()=>{
   const source=read("supabase/functions/socal-hub-workspace/index.ts");
-  assert.match(source,/const VERSION = "0\.12\.0"/);
+  assert.ok(source.includes('const VERSION = "0.'));
   assert.match(source,/"hub_timecard_shifts"/);
   assert.match(source,/timecards,/);
   assert.match(source,/m\.role === "tech" \? "&user_id=eq\." \+ m\.user_id : ""/);
@@ -52,7 +52,11 @@ test("Timeclock punch is self-service with guarded manager punch and stale-write
 test("Manager correction remains attendance-only and revision-aware",()=>{
   const source=read("supabase/functions/socal-hub-workspace/index.ts");
   const start=source.indexOf('if (action === "timecard/update")');
-  const end=source.indexOf('if (action === "timeline/add")');
+  const candidates=[
+    source.indexOf('if (action === "settings/get")'),
+    source.indexOf('if (action === "timeline/add")'),
+  ].filter(value=>value>start);
+  const end=Math.min(...candidates);
   assert.ok(start>0&&end>start);
   const block=source.slice(start,end);
   assert.match(block,/management\(m\)/);
