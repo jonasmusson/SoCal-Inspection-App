@@ -3,7 +3,7 @@ import {createShopmonkeyWriteClient,ShopmonkeyWriteError} from "./shopmonkey.ts"
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
-const VERSION = "0.13.0",
+const VERSION = "0.13.1",
   BUCKET = "hub-pilot-private",
   ARCHIVE = "hub-media-archive";
 const MIME: Record<string, string> = {
@@ -2072,7 +2072,191 @@ if (action === "timeclock/punch") {
         "Attendance, project work and approved billable hours remain separate sources. Open shifts are not counted as completed attendance. Labor value is approved billable hours multiplied by the configured shop rate; it is not an invoice, payment or accounting total.",
     };
   }
-    if (action === "timeline/add") {
+  
+  if (action === "management/review-queue") {
+    management(m);
+    const now = new Date(),
+      [pendingWork, readyWork, tasks, parts, openShifts, inspectionLinks, projectLinks] =
+        await Promise.all([
+          db(
+            "hub_work_entries",
+            `org_id=eq.${m.org_id}&status=eq.pending_review&order=work_date.asc,created_at.asc&limit=1000`,
+          ),
+          db(
+            "hub_work_entries",
+            `org_id=eq.${m.org_id}&status=eq.approved&invoice_state=eq.ready&order=work_date.asc,created_at.asc&limit=1000`,
+          ),
+          db(
+            "hub_project_tasks",
+            `org_id=eq.${m.org_id}&status=in.(todo,in_progress,waiting,blocked)&order=created_at.asc&limit=3000`,
+          ),
+          db(
+            "hub_parts_requests",
+            `org_id=eq.${m.org_id}&status=in.(requested,ordered)&order=created_at.asc&limit=1000`,
+          ),
+          db(
+            "hub_timecard_shifts",
+            `org_id=eq.${m.org_id}&clock_out=is.null&order=clock_in.asc&limit=500`,
+          ),
+          db(
+            "hub_inspection_links",
+            `org_id=eq.${m.org_id}&order=created_at.asc&limit=1000`,
+          ),
+          db(
+            "hub_shopmonkey_project_links",
+            `org_id=eq.${m.org_id}&order=verified_at.desc&limit=1000`,
+          ),
+        ]),
+      inspectionIds = inspectionLinks.map((row:any)=>row.inspection_id),
+      inspections = inspectionIds.length
+        ? await db(
+            "inspections",
+            `id=in.(${inspectionIds.join(",")})&status=eq.pending_review&select=id,status,progress_percent,updated_at,completed_at&order=updated_at.asc`,
+          )
+        : [],
+      inspectionById = new Map(inspections.map((row:any)=>[row.id,row])),
+      pendingInspections = inspectionLinks
+        .filter((link:any)=>inspectionById.has(link.inspection_id))
+        .map((link:any)=>({
+          ...inspectionById.get(link.inspection_id) as any,
+          project_id:link.project_id,
+          vehicle_id:link.vehicle_id,
+        })),
+      unassignedTasks = tasks.filter(
+        (task:any)=>task.status==="todo"&&!task.assigned_user_id,
+      ),
+      blockedTasks = tasks.filter((task:any)=>task.status==="blocked"),
+      waitingTasks = tasks.filter((task:any)=>task.status==="waiting"),
+      activeTasks = tasks.filter((task:any)=>task.status==="in_progress"),
+      projectIds = [
+        ...new Set(
+          [
+            ...pendingWork.map((row:any)=>row.project_id),
+            ...readyWork.map((row:any)=>row.project_id),
+            ...tasks.map((row:any)=>row.project_id),
+            ...parts.map((row:any)=>row.project_id),
+            ...pendingInspections.map((row:any)=>row.project_id),
+          ].filter(Boolean),
+        ),
+      ],
+      projects = projectIds.length
+        ? await db(
+            "hub_pilot_projects",
+            `org_id=eq.${m.org_id}&id=in.(${projectIds.join(",")})&select=id,vehicle_id,title,status,shopmonkey_order_ref`,
+          )
+        : [],
+      projectById = new Map(projects.map((row:any)=>[row.id,row])),
+      vehicleIds = [...new Set(projects.map((row:any)=>row.vehicle_id))],
+      vehicles = vehicleIds.length
+        ? await db(
+            "hub_pilot_vehicles",
+            `org_id=eq.${m.org_id}&id=in.(${vehicleIds.join(",")})&select=id,display_name,year,make,model`,
+          )
+        : [],
+      vehicleById = new Map(vehicles.map((row:any)=>[row.id,row])),
+      peopleIds = [
+        ...new Set(
+          [
+            ...pendingWork.map((row:any)=>row.technician_user_id),
+            ...readyWork.map((row:any)=>row.technician_user_id),
+            ...parts.map((row:any)=>row.requested_by),
+            ...openShifts.map((row:any)=>row.user_id),
+          ].filter(Boolean),
+        ),
+      ],
+      profiles = peopleIds.length
+        ? await db(
+            "user_profiles",
+            `id=in.(${peopleIds.join(",")})&select=id,full_name,email`,
+          )
+        : [],
+      profileById = new Map(profiles.map((row:any)=>[row.id,row])),
+      shopmonkeyByProject = new Map(projectLinks.map((row:any)=>[row.project_id,row])),
+      projectMeta = (projectId:string)=>{
+        const project=projectById.get(projectId) as any,
+          vehicle=project?vehicleById.get(project.vehicle_id) as any:null;
+        return {
+          project_title:project?.title||"",
+          project_status:project?.status||"",
+          vehicle_name:vehicle?.display_name||"",
+          shopmonkey_order_ref:project?.shopmonkey_order_ref||"",
+          shopmonkey_linked:shopmonkeyByProject.has(projectId),
+        };
+      },
+      personName = (userId:string)=>{
+        const profile=profileById.get(userId) as any;
+        return profile?.full_name||profile?.email||"Team member";
+      },
+      pendingWorkRows = pendingWork.map((row:any)=>({
+        ...row,
+        ...projectMeta(row.project_id),
+        technician_name:personName(row.technician_user_id),
+      })),
+      readyWorkRows = readyWork.map((row:any)=>({
+        ...row,
+        ...projectMeta(row.project_id),
+        technician_name:personName(row.technician_user_id),
+      })),
+      decorateTask=(task:any)=>({...task,...projectMeta(task.project_id)}),
+      partsRows = parts.map((row:any)=>({
+        ...row,
+        ...projectMeta(row.project_id),
+        requested_by_name:personName(row.requested_by),
+      })),
+      openShiftRows = openShifts.map((row:any)=>{
+        const started=new Date(row.clock_in),
+          ageHours=(now.getTime()-started.getTime())/3600000;
+        return {
+          ...row,
+          technician_name:personName(row.user_id),
+          open_hours:Number.isFinite(ageHours)?Math.round(ageHours*100)/100:null,
+          needs_manager_attention:Number.isFinite(ageHours)&&ageHours>12,
+        };
+      }),
+      inspectionRows = pendingInspections.map((row:any)=>({
+        ...row,
+        ...projectMeta(row.project_id),
+      })),
+      sumHours=(rows:any[],field:string)=>
+        Math.round(
+          rows.reduce((sum,row)=>sum+Number(row[field]||0),0)*100,
+        )/100;
+    return {
+      counts:{
+        pending_work:pendingWorkRows.length,
+        ready_for_shopmonkey:readyWorkRows.length,
+        unassigned_tasks:unassignedTasks.length,
+        blocked_tasks:blockedTasks.length,
+        waiting_tasks:waitingTasks.length,
+        in_progress_tasks:activeTasks.length,
+        parts_requested:partsRows.filter((row:any)=>row.status==="requested").length,
+        parts_ordered:partsRows.filter((row:any)=>row.status==="ordered").length,
+        open_timecards:openShiftRows.length,
+        stale_open_timecards:openShiftRows.filter((row:any)=>row.needs_manager_attention).length,
+        inspections_pending_review:inspectionRows.length,
+      },
+      hours:{
+        pending_project_hours:sumHours(pendingWorkRows,"actual_hours"),
+        ready_billable_hours:sumHours(readyWorkRows,"billable_hours"),
+        unassigned_ready_hours:sumHours(unassignedTasks,"estimated_hours"),
+        blocked_hours:sumHours(blockedTasks,"estimated_hours"),
+        waiting_hours:sumHours(waitingTasks,"estimated_hours"),
+      },
+      pending_work:pendingWorkRows,
+      ready_for_shopmonkey:readyWorkRows,
+      unassigned_tasks:unassignedTasks.map(decorateTask),
+      blocked_tasks:blockedTasks.map(decorateTask),
+      waiting_tasks:waitingTasks.map(decorateTask),
+      in_progress_tasks:activeTasks.map(decorateTask),
+      parts_requests:partsRows,
+      open_timecards:openShiftRows,
+      inspections_pending_review:inspectionRows,
+      boundary:
+        "Review queue is read-only. It does not approve work, assign tasks, change parts status, approve inspections, edit Timecards or write to Shopmonkey.",
+    };
+  }
+
+  if (action === "timeline/add") {
     const v = await vehicleFor(m, id(b.vehicle_id)),
       p = b.project_id ? await projectFor(m, id(b.project_id)) : null;
     if (p && p.vehicle_id !== v.id) throw new Fault(400, "Project mismatch");
