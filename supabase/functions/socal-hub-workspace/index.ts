@@ -1055,7 +1055,7 @@ async function endpoint(
     if(!key)
       throw new Fault(503,"Voice work drafting is not configured yet.");
     const taskContext=task
-      ? \`Task: \${text(task.title,300)}. Current task status: \${text(task.status,30)}.\`
+      ? `Task: ${text(task.title,300)}. Current task status: ${text(task.status,30)}.`
       : "No specific whiteboard task was selected.";
     const prompt=[
       "Convert a technician's dictated shop note into a review-only SoCal HUB work draft.",
@@ -1067,9 +1067,9 @@ async function endpoint(
       "Only suggest done, blocked or waiting when the technician explicitly says the task is complete, blocked, or waiting. Otherwise use no_change.",
       "Only create a parts request when the technician explicitly says a part/material is needed or requested. Never invent a part number. Default quantity to 1 only when a part is explicitly requested but quantity is not stated.",
       "If wording, hours, parts or status are ambiguous, put a short explanation in warnings rather than guessing.",
-      \`Project: \${text(p.title,300)}.\`,
+      `Project: ${text(p.title,300)}.`,
       taskContext,
-      \`Technician transcript: \${transcript}\`,
+      `Technician transcript: ${transcript}`,
     ].join("\\n\\n");
     try{
       const response=await fetchSafe("https://api.openai.com/v1/responses",{
@@ -1135,7 +1135,7 @@ async function endpoint(
     }
     const open = await one(
       "hub_work_sessions",
-      \`org_id=eq.\${m.org_id}&technician_user_id=eq.\${technician}&status=eq.active&order=started_at.desc\`,
+      `org_id=eq.${m.org_id}&technician_user_id=eq.${technician}&status=eq.active&order=started_at.desc`,
     );
     if (open)
       throw new Fault(
@@ -1159,7 +1159,7 @@ async function endpoint(
     if (task && task.status === "todo")
       await db(
         "hub_project_tasks",
-        \`id=eq.\${task.id}&org_id=eq.\${m.org_id}&status=eq.todo\`,
+        `id=eq.${task.id}&org_id=eq.${m.org_id}&status=eq.todo`,
         "PATCH",
         {
           status: "in_progress",
@@ -1185,7 +1185,7 @@ async function endpoint(
       );
     const rows = await db(
       "hub_work_sessions",
-      \`id=eq.\${session.id}&org_id=eq.\${m.org_id}&status=eq.active&stopped_at=is.null&updated_at=eq.\${encodeURIComponent(session.updated_at)}\`,
+      `id=eq.${session.id}&org_id=eq.${m.org_id}&status=eq.active&stopped_at=is.null&updated_at=eq.${encodeURIComponent(session.updated_at)}`,
       "PATCH",
       {
         status: "stopped",
@@ -1219,7 +1219,7 @@ async function endpoint(
     const now = new Date(),
       rows = await db(
         "hub_work_sessions",
-        \`id=eq.\${session.id}&org_id=eq.\${m.org_id}&status=eq.active&stopped_at=is.null&updated_at=eq.\${encodeURIComponent(session.updated_at)}\`,
+        `id=eq.${session.id}&org_id=eq.${m.org_id}&status=eq.active&stopped_at=is.null&updated_at=eq.${encodeURIComponent(session.updated_at)}`,
         "PATCH",
         {
           status: "cancelled",
