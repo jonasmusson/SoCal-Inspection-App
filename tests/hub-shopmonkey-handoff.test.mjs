@@ -104,3 +104,17 @@ test("Shopmonkey credential stays server-side and absent configuration fails clo
   assert.ok(!source.includes("NEXT_PUBLIC_SHOPMONKEY"));
   assert.ok(!source.includes("VITE_SHOPMONKEY"));
 });
+
+
+test("Owner can verify an existing Shopmonkey service for a HUB system to recover or reuse clean invoice sections",()=>{
+  const source=read("supabase/functions/socal-hub-workspace/index.ts");
+  const start=source.indexOf('if (action === "shopmonkey/service/link")');
+  const end=source.indexOf('if (action === "shopmonkey/preview")');
+  assert.ok(start>0&&end>start);
+  const block=source.slice(start,end);
+  assert.match(block,/management\(m, true\)/);
+  assert.ok(block.includes("shopmonkeyClient().services(orderLink.remote_order_id)"));
+  assert.ok(block.includes("That Shopmonkey service was not found on the linked order."));
+  assert.ok(block.includes('"hub_shopmonkey_service_links"'));
+  assert.ok(block.includes("remote_service_id: remoteServiceId"));
+});
