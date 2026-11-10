@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, User, Home, ClipboardList, Settings, Layers } from 'lucide-react';
+import { LogOut, User, Home, ClipboardList, Settings, Layers, Mic, Wrench } from 'lucide-react';
 
 interface LayoutProps { children: ReactNode; }
 
@@ -11,8 +11,11 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
 
   const navItems = [
-    ...(isManager || isOwner ? [{ path: '/dashboard', icon: Home, label: 'Dashboard' }] : []),
-    { path: '/my-inspections', icon: ClipboardList, label: 'My Work' },
+    ...(isManager || isOwner ? [{ path: '/dashboard', icon: Home, label: 'Inspections' }] : []),
+    { path: '/hub/pilot', icon: Wrench, label: 'Workshop' },
+    ...(isManager || isOwner ? [{ path: '/hub/manage', icon: Home, label: 'Management' }] : []),
+    { path: '/my-inspections', icon: ClipboardList, label: 'Inspections' },
+    { path: '/hub/add-work', icon: Mic, label: 'Add Work' },
     ...(isOwner ? [{ path: '/templates', icon: Layers, label: 'Templates' }] : []),
     ...(isManager || isOwner ? [{ path: '/settings', icon: Settings, label: 'Settings' }] : []),
   ];
