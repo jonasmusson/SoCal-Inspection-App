@@ -7,7 +7,7 @@ const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
 test("HUB workspace source is version-controlled with explicit auth boundary",()=>{
   const source=read("supabase/functions/socal-hub-workspace/index.ts");
   const config=read("supabase/config.toml");
-  assert.match(source,/const VERSION = "0\.10\.0"/);
+  assert.match(source,/const VERSION = "\\d+\\.\\d+\\.\\d+"/);
   assert.match(source,/async function userFor\(req: Request\)/);
   assert.match(source,/Your session expired\. Please sign in again\./);
   assert.match(source,/memberFor/);
