@@ -2,7 +2,7 @@
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
-const VERSION = "0.11.2",
+const VERSION = "0.11.3",
   BUCKET = "hub-pilot-private",
   ARCHIVE = "hub-media-archive";
 const MIME: Record<string, string> = {
@@ -22,6 +22,7 @@ const CATEGORIES = [
   "Mechanical",
   "Fabrication",
   "Inspection",
+  "Clipboard",
   "Other",
 ];
 const PART_REQUEST_STATUSES = ["requested", "ordered", "received", "cancelled"];
@@ -242,7 +243,7 @@ async function bodyFor(req: Request) {
     const { done, value } = await reader.read();
     if (done) break;
     len += value.length;
-    if (len > 65536) {
+    if (len > 524288) {
       await reader.cancel();
       throw new Fault(413, "Request is too large.");
     }
@@ -384,6 +385,7 @@ async function endpoint(
       project_tasks,
       member_task_skills,
       parts_requests,
+      clipboard_intakes,
     ] = await Promise.all([
       db("hub_pilot_projects", scope + "&order=created_at.asc&limit=500"),
       db("hub_pilot_media", scope + "&order=created_at.desc&limit=500"),
@@ -417,6 +419,12 @@ async function endpoint(
         "hub_parts_requests",
         scope + "&order=created_at.desc&limit=2000",
       ),
+      m.role === "tech"
+        ? []
+        : db(
+            "hub_clipboard_intakes",
+            scope + "&order=applied_at.desc&limit=500",
+          ),
     ]);
     const techIds = [
         ...new Set(work_entries.map((x: any) => x.technician_user_id)),
@@ -443,6 +451,7 @@ async function endpoint(
       project_tasks,
       member_task_skills,
       parts_requests,
+      clipboard_intakes,
       work_profiles,
       work_systems: WORK_SYSTEMS,
       task_statuses: TASK_STATUSES,
@@ -1116,6 +1125,56 @@ async function endpoint(
         "This parts request changed on another device. Refresh before saving.",
       );
     return rows[0];
+  }
+
+  if (action === "clipboard/apply") {
+    management(m);
+    const requestId = id(b.request_id),
+      projectId = id(b.project_id),
+      mediaIds = Array.isArray(b.media_ids)
+        ? [...new Set(b.media_ids.map(id))]
+        : [],
+      lines = Array.isArray(b.lines) ? b.lines : [];
+    if (mediaIds.length < 1 || mediaIds.length > 6)
+      throw new Fault(400, "Add between 1 and 6 clipboard photos.");
+    if (lines.length < 1 || lines.length > 100)
+      throw new Fault(400, "Clipboard must contain between 1 and 100 reviewed work lines.");
+    if (b.invoice_ready && m.role !== "owner")
+      throw new Fault(
+        403,
+        "Owner permission is required to mark clipboard work Ready for Invoice.",
+      );
+    await projectFor(m, projectId);
+    return await rpc("hub_apply_clipboard_intake", {
+      p_actor: u.id,
+      p_org: m.org_id,
+      p_request: requestId,
+      p_project: projectId,
+      p_media_ids: mediaIds,
+      p_summary: text(b.summary, 4000),
+      p_lines: lines,
+      p_invoice_ready: Boolean(b.invoice_ready),
+    });
+  }
+  if (action === "clipboard/get") {
+    management(m);
+    const intake = await one(
+      "hub_clipboard_intakes",
+      `id=eq.${id(url.searchParams.get("id"))}&org_id=eq.${m.org_id}`,
+    );
+    if (!intake) throw new Fault(404, "Clipboard intake unavailable.");
+    await projectFor(m, intake.project_id);
+    const [media, lines] = await Promise.all([
+      db(
+        "hub_clipboard_intake_media",
+        `intake_id=eq.${intake.id}&order=media_id.asc`,
+      ),
+      db(
+        "hub_clipboard_lines",
+        `intake_id=eq.${intake.id}&order=line_order.asc`,
+      ),
+    ]);
+    return { intake, media, lines };
   }
   if (action === "timeline/add") {
     const v = await vehicleFor(m, id(b.vehicle_id)),
