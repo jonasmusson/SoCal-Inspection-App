@@ -923,7 +923,7 @@ async function endpoint(
     }
     const open = await one(
       "hub_work_sessions",
-      \`org_id=eq.\${m.org_id}&technician_user_id=eq.\${technician}&status=eq.active&order=started_at.desc\`,
+      `org_id=eq.${m.org_id}&technician_user_id=eq.${technician}&status=eq.active&order=started_at.desc`,
     );
     if (open)
       throw new Fault(
@@ -947,7 +947,7 @@ async function endpoint(
     if (task && task.status === "todo")
       await db(
         "hub_project_tasks",
-        \`id=eq.\${task.id}&org_id=eq.\${m.org_id}&status=eq.todo\`,
+        `id=eq.${task.id}&org_id=eq.${m.org_id}&status=eq.todo`,
         "PATCH",
         {
           status: "in_progress",
@@ -973,7 +973,7 @@ async function endpoint(
       );
     const rows = await db(
       "hub_work_sessions",
-      \`id=eq.\${session.id}&org_id=eq.\${m.org_id}&status=eq.active&stopped_at=is.null&updated_at=eq.\${encodeURIComponent(session.updated_at)}\`,
+      `id=eq.${session.id}&org_id=eq.${m.org_id}&status=eq.active&stopped_at=is.null&updated_at=eq.${encodeURIComponent(session.updated_at)}`,
       "PATCH",
       {
         status: "stopped",
@@ -1007,7 +1007,7 @@ async function endpoint(
     const now = new Date(),
       rows = await db(
         "hub_work_sessions",
-        \`id=eq.\${session.id}&org_id=eq.\${m.org_id}&status=eq.active&stopped_at=is.null&updated_at=eq.\${encodeURIComponent(session.updated_at)}\`,
+        `id=eq.${session.id}&org_id=eq.${m.org_id}&status=eq.active&stopped_at=is.null&updated_at=eq.${encodeURIComponent(session.updated_at)}`,
         "PATCH",
         {
           status: "cancelled",
