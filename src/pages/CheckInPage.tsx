@@ -11,8 +11,17 @@ import {
   FileText, Users, AlertCircle, Palette, CheckCircle, ClipboardList,
 } from 'lucide-react';
 import { withTimeout } from '../lib/async';
+import {
+  clearCheckinDraft,
+  loadCheckinDraftMedia,
+  loadCheckinDraftState,
+  removeCheckinDraftMedia,
+  saveCheckinDraftMedia,
+  saveCheckinDraftState,
+  CheckinDraftState,
+} from '../lib/checkinDraft';
 
-interface LocalPhoto { file: File; preview: string; }
+interface LocalPhoto { id: string; file: File; preview: string; }
 
 interface CheckinConfig {
   photosMode: MediaMode;
@@ -31,6 +40,18 @@ interface SuccessData {
 }
 
 const DEFAULT_CONFIG: CheckinConfig = { photosMode: 'required', videoMode: 'optional', notesMode: 'optional' };
+const CHECKIN_DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function newDraftMediaId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function preferNativeVideoCapture() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+}
 
 export function CheckInPage() {
   const navigate = useNavigate();
@@ -58,14 +79,99 @@ export function CheckInPage() {
 
   const [localPhotos, setLocalPhotos] = useState<LocalPhoto[]>([]);
   const [localVideo, setLocalVideo] = useState<File | null>(null);
+  const [localVideoId, setLocalVideoId] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const [draftWarning, setDraftWarning] = useState<string | null>(null);
   const [assignedTechId, setAssignedTechId] = useState('');
   const [customMake, setCustomMake] = useState(false);
   const [customModel, setCustomModel] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showVideoRecorder, setShowVideoRecorder] = useState(false);
+  const [nativeVideoCapture] = useState(preferNativeVideoCapture);
+  const videoCaptureInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => { loadInit(); }, []);
+  useEffect(() => {
+    if (!profile?.id) return;
+    let cancelled = false;
+
+    (async () => {
+      const draft = loadCheckinDraftState<typeof form>(profile.id);
+      if (!draft) {
+        if (!cancelled) setDraftReady(true);
+        return;
+      }
+      if (Date.now() - draft.saved_at > CHECKIN_DRAFT_MAX_AGE_MS) {
+        await clearCheckinDraft(profile.id).catch(() => undefined);
+        if (!cancelled) setDraftReady(true);
+        return;
+      }
+
+      try {
+        const restoredPhotos = (await Promise.all(
+          draft.photo_ids.map(async id => {
+            const file = await loadCheckinDraftMedia(profile.id, id, 'photo');
+            return file ? { id, file, preview: URL.createObjectURL(file) } : null;
+          }),
+        )).filter((item): item is LocalPhoto => item !== null);
+
+        const restoredVideo = draft.video_id
+          ? await loadCheckinDraftMedia(profile.id, draft.video_id, 'video')
+          : null;
+
+        if (cancelled) {
+          restoredPhotos.forEach(photo => URL.revokeObjectURL(photo.preview));
+          return;
+        }
+
+        setForm(draft.form);
+        setStep(draft.step);
+        setAssignedTechId(draft.assigned_tech_id || '');
+        setCustomMake(Boolean(draft.custom_make));
+        setCustomModel(Boolean(draft.custom_model));
+        setLocalPhotos(restoredPhotos);
+        setLocalVideo(restoredVideo);
+        setLocalVideoId(restoredVideo ? draft.video_id : null);
+        setDraftSavedAt(new Date(draft.saved_at));
+        setDraftRestored(true);
+        if (
+          restoredPhotos.length !== draft.photo_ids.length ||
+          Boolean(draft.video_id && !restoredVideo)
+        ) {
+          setDraftWarning('Check-in details were restored, but one or more local media files could not be recovered.');
+        }
+      } catch {
+        if (!cancelled) {
+          setDraftWarning('The check-in details were restored, but one or more local media files could not be recovered.');
+          setForm(draft.form);
+          setStep(draft.step);
+          setAssignedTechId(draft.assigned_tech_id || '');
+          setCustomMake(Boolean(draft.custom_make));
+          setCustomModel(Boolean(draft.custom_model));
+          setDraftSavedAt(new Date(draft.saved_at));
+          setDraftRestored(true);
+        }
+      } finally {
+        if (!cancelled) setDraftReady(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [profile?.id]);
   useEffect(() => { if (form.template_id) loadCheckinConfig(form.template_id); }, [form.template_id]);
+  useEffect(() => {
+    if (!draftReady || !profile?.id || success) return;
+    const timer = window.setTimeout(() => {
+      persistDraftNow();
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [
+    draftReady, profile?.id, success, step, form, assignedTechId,
+    customMake, customModel, localPhotos, localVideoId,
+  ]);
+
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -82,7 +188,10 @@ export function CheckInPage() {
       supabase.from('user_profiles').select('*').eq('status', 'active').order('full_name'),
       supabase.from('shop_settings').select('key, value'),
     ]));
-    if (tmplData?.length) { setTemplates(tmplData); setForm(f => ({ ...f, template_id: tmplData[0].id })); }
+    if (tmplData?.length) {
+      setTemplates(tmplData);
+      setForm(f => ({ ...f, template_id: f.template_id || tmplData[0].id }));
+    }
     if (staffData) setStaff(staffData as UserProfile[]);
     if (settingsData) {
       const get = (k: string) => settingsData.find((setting: { key: string; value: string }) => setting.key === k)?.value;
@@ -92,6 +201,27 @@ export function CheckInPage() {
       setInitError(true);
     } finally {
       setInitLoading(false);
+    }
+  }
+
+  function persistDraftNow() {
+    if (!profile?.id || success) return;
+    const draft: CheckinDraftState<typeof form> = {
+      version: 1,
+      saved_at: Date.now(),
+      step,
+      form,
+      assigned_tech_id: assignedTechId,
+      custom_make: customMake,
+      custom_model: customModel,
+      photo_ids: localPhotos.map(photo => photo.id),
+      video_id: localVideoId,
+    };
+    try {
+      saveCheckinDraftState(profile.id, draft);
+      setDraftSavedAt(new Date(draft.saved_at));
+    } catch {
+      setDraftWarning('This device could not autosave the check-in details. Keep the app open until the inspection is created.');
     }
   }
 
@@ -112,30 +242,85 @@ export function CheckInPage() {
     });
   }
 
-  function handlePhotoCapture(file: File) {
-    setLocalPhotos(prev => [...prev, { file, preview: URL.createObjectURL(file) }]);
+  async function addDraftPhoto(file: File) {
+    const id = newDraftMediaId();
+    if (profile?.id) {
+      try {
+        await saveCheckinDraftMedia(profile.id, id, 'photo', file);
+      } catch {
+        setDraftWarning('Photo captured, but its recovery copy could not be saved on this device. Keep the app open until check-in is complete.');
+      }
+    }
+    setLocalPhotos(prev => [...prev, { id, file, preview: URL.createObjectURL(file) }]);
+  }
+
+  async function handlePhotoCapture(file: File) {
+    await addDraftPhoto(file);
     setShowCamera(false);
   }
 
-  function handlePhotoUpload(files: FileList | null) {
+  async function handlePhotoUpload(files: FileList | null) {
     if (!files) return;
-    const additions = Array.from(files)
-      .filter(file => file.type.startsWith('image/'))
-      .map(file => ({ file, preview: URL.createObjectURL(file) }));
-    setLocalPhotos(prev => [...prev, ...additions]);
+    for (const file of Array.from(files).filter(file => file.type.startsWith('image/'))) {
+      await addDraftPhoto(file);
+    }
   }
 
   function removePhoto(idx: number) {
-    setLocalPhotos(prev => { URL.revokeObjectURL(prev[idx].preview); return prev.filter((_, i) => i !== idx); });
+    setLocalPhotos(prev => {
+      const target = prev[idx];
+      if (target) {
+        URL.revokeObjectURL(target.preview);
+        if (profile?.id) void removeCheckinDraftMedia(profile.id, target.id, 'photo');
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
   }
 
-  function handleVideoRecorded(file: File) {
+  async function saveDraftVideo(file: File) {
+    const id = newDraftMediaId();
+    if (profile?.id) {
+      try {
+        if (localVideoId) await removeCheckinDraftMedia(profile.id, localVideoId, 'video').catch(() => undefined);
+        await saveCheckinDraftMedia(profile.id, id, 'video', file);
+      } catch {
+        setDraftWarning('Video recorded, but its recovery copy could not be saved on this device. Keep the app open until check-in is complete.');
+      }
+    }
     setLocalVideo(file);
+    setLocalVideoId(id);
+  }
+
+  async function handleVideoRecorded(file: File) {
+    await saveDraftVideo(file);
     setShowVideoRecorder(false);
   }
 
-  function handleVideoUpload(file: File | undefined) {
-    if (file?.type.startsWith('video/')) setLocalVideo(file);
+  async function handleVideoUpload(file: File | undefined) {
+    if (file?.type.startsWith('video/')) await saveDraftVideo(file);
+  }
+
+  async function discardDraft() {
+    if (profile?.id) await clearCheckinDraft(profile.id).catch(() => undefined);
+    localPhotos.forEach(photo => URL.revokeObjectURL(photo.preview));
+    setLocalPhotos([]);
+    setLocalVideo(null);
+    setLocalVideoId(null);
+    setAssignedTechId('');
+    setCustomMake(false);
+    setCustomModel(false);
+    setStep(1);
+    setDraftRestored(false);
+    setDraftSavedAt(null);
+    setDraftWarning(null);
+    setForm({
+      template_id: templates[0]?.id || '',
+      customer_first_name: '', customer_last_name: '',
+      customer_phone: '', customer_email: '',
+      customer_address: '', customer_city: '', customer_state: '', customer_zip: '',
+      vehicle_year: new Date().getFullYear(), vehicle_make: '', vehicle_model: '',
+      vehicle_color: '', vehicle_vin: '', vehicle_mileage: 0, checkin_notes: '',
+    });
   }
 
   const photosRef = useRef<HTMLElement | null>(null);
@@ -251,6 +436,9 @@ export function CheckInPage() {
     }
 
     const tech = staff.find(s => s.id === assignedTechId);
+    if (profile?.id) await clearCheckinDraft(profile.id).catch(() => undefined);
+    setDraftRestored(false);
+    setDraftSavedAt(null);
     setSubmitting(false);
     setSuccess({
       inspectionId: inspection.id,
@@ -379,6 +567,23 @@ export function CheckInPage() {
           </div>
         </div>
       </div>
+
+      {(draftRestored || draftSavedAt || draftWarning) && (
+        <div className="px-4 pt-3">
+          <div className={`rounded-xl border px-3 py-2.5 text-xs ${draftWarning ? 'border-warning-200 bg-warning-50 text-warning-800' : 'border-success-200 bg-success-50 text-success-700'}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                {draftRestored ? <strong>Draft restored. </strong> : null}
+                {draftWarning || (draftSavedAt ? `Autosaved ${draftSavedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Autosave active')}
+              </div>
+              <button type="button" onClick={() => void discardDraft()}
+                className="flex-shrink-0 font-semibold underline underline-offset-2">
+                Discard Draft
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Step 1: Info ─────────────────────────────────────────────────────── */}
       {step === 1 && (
@@ -663,7 +868,7 @@ export function CheckInPage() {
                 }`}>
                   <FileText className="w-4 h-4" /> Upload Photos
                   <input type="file" accept="image/*" multiple className="sr-only"
-                    onChange={e => { handlePhotoUpload(e.target.files); e.target.value = ''; }} />
+                    onChange={e => { void handlePhotoUpload(e.target.files); e.target.value = ''; }} />
                 </label>
               </div>
             </section>
@@ -683,7 +888,9 @@ export function CheckInPage() {
                   {localVideo ? 'Recorded' : videoRequired ? 'Required' : 'Optional'}
                 </span>
               </div>
-              <SectionHelp text="Record a full walk-around to capture any pre-existing dents, scratches, or damage on all sides." />
+              <SectionHelp text={nativeVideoCapture
+                ? "Record a full walk-around with the iPhone camera. Your check-in draft is saved before the camera opens so it can recover if the browser reloads."
+                : "Record a full walk-around to capture any pre-existing dents, scratches, or damage on all sides."} />
 
               {localVideo && (
                 <div className="mt-3 mb-3 p-3 bg-success-50 border border-success-200 rounded-xl flex items-center gap-3">
@@ -694,7 +901,11 @@ export function CheckInPage() {
                     <p className="text-sm font-medium text-success-700 truncate">{localVideo.name}</p>
                     <p className="text-xs text-success-600">{(localVideo.size / (1024 * 1024)).toFixed(1)} MB</p>
                   </div>
-                  <button onClick={() => setLocalVideo(null)}
+                  <button onClick={() => {
+                      if (profile?.id && localVideoId) void removeCheckinDraftMedia(profile.id, localVideoId, 'video');
+                      setLocalVideo(null);
+                      setLocalVideoId(null);
+                    }}
                     className="text-success-500 hover:text-danger-500 transition-colors flex-shrink-0">
                     <X className="w-4 h-4" />
                   </button>
@@ -702,16 +913,32 @@ export function CheckInPage() {
               )}
 
               <div className="grid grid-cols-2 gap-2 mt-3">
-                <button type="button" onClick={() => setShowVideoRecorder(true)}
+                <button type="button"
+                  onClick={() => {
+                    persistDraftNow();
+                    if (nativeVideoCapture) videoCaptureInputRef.current?.click();
+                    else setShowVideoRecorder(true);
+                  }}
                   className="flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 justify-center hover:bg-gray-50">
                   <Video className="w-4 h-4" /> {localVideo ? 'Re-record' : 'Record Video'}
                 </button>
+                <input
+                  ref={videoCaptureInputRef}
+                  type="file"
+                  accept="video/*"
+                  capture="environment"
+                  className="sr-only"
+                  onChange={e => {
+                    void handleVideoUpload(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
                 <label className={`flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border justify-center cursor-pointer ${
                   !localVideo && videoRequired ? 'border-primary-400 text-primary-600 bg-primary-50 hover:bg-primary-100' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                 }`}>
                   <FileText className="w-4 h-4" /> Upload Video
                   <input type="file" accept="video/*" className="sr-only"
-                    onChange={e => { handleVideoUpload(e.target.files?.[0]); e.target.value = ''; }} />
+                    onChange={e => { void handleVideoUpload(e.target.files?.[0]); e.target.value = ''; }} />
                 </label>
               </div>
             </section>
