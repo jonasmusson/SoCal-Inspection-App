@@ -3,7 +3,7 @@ import {createShopmonkeyWriteClient,ShopmonkeyWriteError} from "./shopmonkey.ts"
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
-const VERSION = "0.13.0",
+const VERSION = "0.13.1",
   BUCKET = "hub-pilot-private",
   ARCHIVE = "hub-media-archive";
 const MIME: Record<string, string> = {
@@ -256,6 +256,15 @@ function nextWeekStart(value: string) {
 const round2 = (value: number) => Math.round(value * 100) / 100;
 const pct = (value: number, base: number) =>
   base > 0 ? Math.round((value / base) * 1000) / 10 : 0;
+async function workSessionFor(m: any, sid: string) {
+  const session = await one(
+    "hub_work_sessions",
+    `id=eq.${id(sid)}&org_id=eq.${m.org_id}`,
+  );
+  if (!session) throw new Fault(404, "Work session unavailable.");
+  await projectFor(m, session.project_id);
+  return session;
+}
 async function inspectionFor(m: any, pid: string) {
   const p = await projectFor(m, pid),
     l = await one(
@@ -436,6 +445,7 @@ async function endpoint(
       shopmonkey_project_links,
       shopmonkey_work_links,
       timecards,
+      work_sessions,
     ] = await Promise.all([
       db("hub_pilot_projects", scope + "&order=created_at.asc&limit=500"),
       db("hub_pilot_media", scope + "&order=created_at.desc&limit=500"),
@@ -491,6 +501,10 @@ async function endpoint(
         "hub_timecard_shifts",
         `org_id=eq.${m.org_id}${m.role === "tech" ? "&user_id=eq." + m.user_id : ""}&order=work_date.desc,clock_in.desc&limit=2000`,
       ),
+      db(
+        "hub_work_sessions",
+        scope + `${m.role === "tech" ? "&technician_user_id=eq." + m.user_id : ""}&order=started_at.desc&limit=1000`,
+      ),
     ]);
     const techIds = [
         ...new Set(work_entries.map((x: any) => x.technician_user_id)),
@@ -521,6 +535,7 @@ async function endpoint(
       shopmonkey_project_links,
       shopmonkey_work_links,
       timecards,
+      work_sessions,
       work_profiles,
       work_systems: WORK_SYSTEMS,
       task_statuses: TASK_STATUSES,
@@ -879,6 +894,137 @@ async function endpoint(
       values,
     );
   }
+
+  if (action === "work-session/start") {
+    const p = await projectFor(m, id(b.project_id)),
+      task = b.task_id ? await taskFor(m, id(b.task_id)) : null;
+    let technician = u.id;
+    if (m.role !== "tech" && b.technician_user_id)
+      technician = id(b.technician_user_id);
+    if (
+      m.role === "tech" &&
+      b.technician_user_id &&
+      b.technician_user_id !== u.id
+    )
+      throw new Fault(403, "Technicians can only start their own work session.");
+    const member = await activeMemberFor(m, technician);
+    if (member.role === "tech" && !(await assignmentFor(m, p.vehicle_id, technician)))
+      throw new Fault(403, "This vehicle is not assigned to that technician.");
+    if (task) {
+      if (task.project_id !== p.id)
+        throw new Fault(400, "Task and project do not match.");
+      if (task.assigned_user_id !== technician)
+        throw new Fault(409, "Assign this task to the technician before starting work.");
+      if (!["todo", "in_progress"].includes(task.status))
+        throw new Fault(
+          409,
+          "Only To Do or In Progress tasks can be started. Resolve Waiting, Blocked or Done first.",
+        );
+    }
+    const open = await one(
+      "hub_work_sessions",
+      \`org_id=eq.\${m.org_id}&technician_user_id=eq.\${technician}&status=eq.active&order=started_at.desc\`,
+    );
+    if (open)
+      throw new Fault(
+        409,
+        "This technician already has active project work. Stop it before starting another task.",
+      );
+    const rows = await db("hub_work_sessions", "", "POST", {
+      org_id: m.org_id,
+      vehicle_id: p.vehicle_id,
+      project_id: p.id,
+      task_id: task?.id || null,
+      technician_user_id: technician,
+      started_by: u.id,
+      stopped_by: null,
+      started_at: new Date().toISOString(),
+      stopped_at: null,
+      status: "active",
+      start_note: text(b.start_note, 1000),
+      stop_note: "",
+    });
+    if (task && task.status === "todo")
+      await db(
+        "hub_project_tasks",
+        \`id=eq.\${task.id}&org_id=eq.\${m.org_id}&status=eq.todo\`,
+        "PATCH",
+        {
+          status: "in_progress",
+          updated_by: u.id,
+          updated_at: new Date().toISOString(),
+        },
+      );
+    return rows[0];
+  }
+  if (action === "work-session/stop") {
+    const session = await workSessionFor(m, id(b.id));
+    if (m.role === "tech" && session.technician_user_id !== u.id)
+      throw new Fault(403, "Technicians can only stop their own work session.");
+    if (session.status !== "active" || session.stopped_at)
+      throw new Fault(409, "This work session is no longer active.");
+    const now = new Date(),
+      started = new Date(session.started_at),
+      elapsedHours = (now.getTime() - started.getTime()) / 3600000;
+    if (!Number.isFinite(elapsedHours) || elapsedHours < 0 || elapsedHours > 18)
+      throw new Fault(
+        409,
+        "This work session needs manager review before it can be stopped.",
+      );
+    const rows = await db(
+      "hub_work_sessions",
+      \`id=eq.\${session.id}&org_id=eq.\${m.org_id}&status=eq.active&stopped_at=is.null&updated_at=eq.\${encodeURIComponent(session.updated_at)}\`,
+      "PATCH",
+      {
+        status: "stopped",
+        stopped_at: now.toISOString(),
+        stopped_by: u.id,
+        stop_note: text(b.stop_note, 1000),
+        updated_at: now.toISOString(),
+      },
+    );
+    if (!rows.length)
+      throw new Fault(
+        409,
+        "This work session changed on another device. Refresh before stopping it.",
+      );
+    return {
+      session: rows[0],
+      suggested_actual_hours: Math.round(elapsedHours * 100) / 100,
+      next_step:
+        "Describe the work performed and submit the digital clipboard entry. Elapsed session time is a suggestion, not billable truth.",
+    };
+  }
+  if (action === "work-session/cancel") {
+    const session = await workSessionFor(m, id(b.id));
+    if (m.role === "tech" && session.technician_user_id !== u.id)
+      throw new Fault(403, "Technicians can only cancel their own work session.");
+    if (session.status !== "active" || session.stopped_at)
+      throw new Fault(409, "This work session is no longer active.");
+    const note = text(b.stop_note, 1000);
+    if (!note)
+      throw new Fault(400, "Add a short reason for cancelling this work session.");
+    const now = new Date(),
+      rows = await db(
+        "hub_work_sessions",
+        \`id=eq.\${session.id}&org_id=eq.\${m.org_id}&status=eq.active&stopped_at=is.null&updated_at=eq.\${encodeURIComponent(session.updated_at)}\`,
+        "PATCH",
+        {
+          status: "cancelled",
+          stopped_at: now.toISOString(),
+          stopped_by: u.id,
+          stop_note: note,
+          updated_at: now.toISOString(),
+        },
+      );
+    if (!rows.length)
+      throw new Fault(
+        409,
+        "This work session changed on another device. Refresh before cancelling it.",
+      );
+    return rows[0];
+  }
+
   if (action === "work/create") {
     const p = await projectFor(m, id(b.project_id)),
       task = b.task_id ? await taskFor(m, id(b.task_id)) : null,
