@@ -17,6 +17,7 @@ Use the review-only Workshop demos before any isolated database setup:
 
 - /review/hub/pilot — technician home / day flow
 - /review/hub/add-work — talk-to-text work entry
+- /review/hub/photos — project photo capture/import
 - /review/hub/manage — owner/manager view
 
 All three demo routes are designed to make no HUB writes.
@@ -78,8 +79,17 @@ Do not connect a real customer invoice.
 13. Save as Pending Review.
 14. Request a part.
 15. Record one Other Time / Constraint entry.
-16. Mark one task Blocked or Waiting through the normal task workflow.
-17. Clock Out.
+16. Take one in-app project photo and import one existing photo.
+17. Confirm both are associated to the intended project.
+18. Simulate/retry one failed upload without recapturing the photo.
+19. Mark one task Blocked or Waiting through the normal task workflow.
+20. Clock Out.
+
+Photo pass conditions:
+- in-app capture does not require saving a duplicate to the device library;
+- upload shows clear Ready / Uploading / Verifying / Saved / Retry state;
+- a failed finalize can retry the same pending item;
+- the project association is obvious before capture.
 
 Record:
 - taps required;
