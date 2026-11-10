@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, Mic, Package, Play, Plus, RefreshCw, Save, Square, Wrench } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, Clock, Mic, Package, Play, Plus, RefreshCw, Save, Square, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { hubWorkspace } from '../lib/hubWorkspace';
 
@@ -162,6 +162,12 @@ export function HubPilotPage({ demoMode = false }: { demoMode?: boolean }) {
     task_id: currentTask.id,
     suggested_hours: 0,
   } : null);
+  const photoPath = (() => {
+    const base = demoMode ? '/review/hub/photos' : '/hub/photos';
+    const project = activeSession?.project_id || currentTask?.project_id || '';
+    if (!project) return base;
+    return base + '?' + new URLSearchParams({ project_id: project }).toString();
+  })();
   const addWorkPath = (() => {
     const base = demoMode ? '/review/hub/add-work' : '/hub/add-work';
     if (!addWorkContext) return base;
@@ -503,6 +509,10 @@ export function HubPilotPage({ demoMode = false }: { demoMode?: boolean }) {
           <button type="button" onClick={() => navigate(addWorkPath)}
             className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl bg-stone-950 p-3 font-bold text-white shadow-sm">
             <Mic className="h-6 w-6" /> {lastStopped ? 'Document Work' : 'Add Work'}
+          </button>
+          <button type="button" onClick={() => navigate(photoPath)}
+            className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl border border-stone-300 bg-white p-3 font-bold text-stone-900 shadow-sm">
+            <Camera className="h-6 w-6" /> Photos
           </button>
           <button type="button" onClick={() => setPartsOpen(value => !value)}
             className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl border border-stone-300 bg-white p-3 font-bold text-stone-900 shadow-sm">
