@@ -3,7 +3,7 @@ import {createShopmonkeyWriteClient,ShopmonkeyWriteError} from "./shopmonkey.ts"
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
-const VERSION = "0.14.0",
+const VERSION = "0.15.0",
   BUCKET = "hub-pilot-private",
   ARCHIVE = "hub-media-archive";
 const MIME: Record<string, string> = {
@@ -34,6 +34,50 @@ const PART_REQUEST_URGENCY = ["normal", "urgent"];
 const TASK_STATUSES = ["todo", "in_progress", "waiting", "blocked", "done"];
 const TASK_PRIORITIES = ["urgent", "high", "normal", "low"];
 const TASK_SKILLS = ["L1", "L2", "L2S", "L3", "F", "QA"];
+const CONTRIBUTION_TYPES = [
+  "customer_production",
+  "customer_support",
+  "internal_investment",
+  "shop_operations",
+  "training_supervision",
+  "rework_warranty",
+];
+const ECONOMIC_TYPES = [
+  "billable_labor",
+  "customer_fee",
+  "internal_investment",
+  "operating_cost",
+  "training_investment",
+  "quality_cost",
+];
+const CAPACITY_PRODUCTIVE = [
+  "transport_support",
+  "shop_operations",
+  "training",
+  "supervision",
+  "admin_documentation",
+];
+const CAPACITY_CONSTRAINED = [
+  "no_work_available",
+  "waiting_parts",
+  "waiting_authorization",
+  "waiting_supervision",
+  "vehicle_unavailable",
+  "equipment_issue",
+];
+const CAPACITY_CATEGORIES = [
+  ...CAPACITY_PRODUCTIVE,
+  ...CAPACITY_CONSTRAINED,
+  "unaccounted",
+];
+const capacityCreditFor = (category: string) =>
+  CAPACITY_PRODUCTIVE.includes(category)
+    ? "productive"
+    : CAPACITY_CONSTRAINED.includes(category)
+      ? "constrained"
+      : category === "unaccounted"
+        ? "unaccounted"
+        : null;
 const WORK_SYSTEMS = [
   "Engine",
   "Transmission",
@@ -579,6 +623,7 @@ async function endpoint(
       shopmonkey_work_links,
       timecards,
       work_sessions,
+      capacity_entries,
     ] = await Promise.all([
       db("hub_pilot_projects", scope + "&order=created_at.asc&limit=500"),
       db("hub_pilot_media", scope + "&order=created_at.desc&limit=500"),
@@ -638,6 +683,10 @@ async function endpoint(
         "hub_work_sessions",
         scope + `${m.role === "tech" ? "&technician_user_id=eq." + m.user_id : ""}&order=started_at.desc&limit=1000`,
       ),
+      db(
+        "hub_capacity_entries",
+        `org_id=eq.${m.org_id}${m.role === "tech" ? "&technician_user_id=eq." + m.user_id : ""}&order=work_date.desc,created_at.desc&limit=2000`,
+      ),
     ]);
     const techIds = [
         ...new Set(work_entries.map((x: any) => x.technician_user_id)),
@@ -669,6 +718,7 @@ async function endpoint(
       shopmonkey_work_links,
       timecards,
       work_sessions,
+      capacity_entries,
       work_profiles,
       work_systems: WORK_SYSTEMS,
       task_statuses: TASK_STATUSES,
@@ -676,6 +726,9 @@ async function endpoint(
       task_skills: TASK_SKILLS,
       part_request_statuses: PART_REQUEST_STATUSES,
       part_request_urgency: PART_REQUEST_URGENCY,
+      contribution_types: CONTRIBUTION_TYPES,
+      economic_types: ECONOMIC_TYPES,
+      capacity_categories: CAPACITY_CATEGORIES,
     };
   }
 if (action === "tech/home") {
@@ -844,12 +897,38 @@ if (action === "tech/home") {
 
     if (action === "project/create") {
     management(m);
-    return await rpc("hub_create_job", {
+    const result:any = await rpc("hub_create_job", {
       p_actor: u.id,
       p_org: m.org_id,
       p_request: id(b.request_id),
       p_data: b.data,
     });
+    if (result?.project?.id) {
+      const contribution = text(b.data?.contribution_default || "", 40),
+        economic = text(b.data?.economic_default || "", 40),
+        values:any = {};
+      if (contribution) {
+        if (!CONTRIBUTION_TYPES.includes(contribution))
+          throw new Fault(400, "Choose a valid contribution type.");
+        values.contribution_default = contribution;
+      }
+      if (economic) {
+        if (!ECONOMIC_TYPES.includes(economic))
+          throw new Fault(400, "Choose a valid economic treatment.");
+        values.economic_default = economic;
+      }
+      if (Object.keys(values).length) {
+        values.updated_at = new Date().toISOString();
+        const rows = await db(
+          "hub_pilot_projects",
+          `id=eq.${result.project.id}&org_id=eq.${m.org_id}`,
+          "PATCH",
+          values,
+        );
+        if (rows.length) result.project = rows[0];
+      }
+    }
+    return result;
   }
   if (action === "project/update") {
     management(m);
@@ -868,6 +947,18 @@ if (action === "tech/home") {
     }
     if ("shopmonkey_order_ref" in b)
       values.shopmonkey_order_ref = text(b.shopmonkey_order_ref, 100) || null;
+    if ("contribution_default" in b) {
+      const contribution = text(b.contribution_default, 40);
+      if (!CONTRIBUTION_TYPES.includes(contribution))
+        throw new Fault(400, "Choose a valid contribution type.");
+      values.contribution_default = contribution;
+    }
+    if ("economic_default" in b) {
+      const economic = text(b.economic_default, 40);
+      if (!ECONOMIC_TYPES.includes(economic))
+        throw new Fault(400, "Choose a valid economic treatment.");
+      values.economic_default = economic;
+    }
     return await db(
       "hub_pilot_projects",
       `id=eq.${p.id}&org_id=eq.${m.org_id}`,
@@ -1468,6 +1559,12 @@ if (action === "tech/home") {
       system,
       work_performed: performed,
       internal_notes: text(b.internal_notes, 4000),
+      contribution_type: CONTRIBUTION_TYPES.includes(p.contribution_default)
+        ? p.contribution_default
+        : "customer_production",
+      economic_type: ECONOMIC_TYPES.includes(p.economic_default)
+        ? p.economic_default
+        : "billable_labor",
       status: "pending_review",
     });
   }
@@ -1548,6 +1645,18 @@ if (action === "tech/home") {
         values.invoice_state = b.invoice_state;
       }
       if ("review_note" in b) values.review_note = text(b.review_note, 2000);
+      if ("contribution_type" in b) {
+        const contribution = text(b.contribution_type, 40);
+        if (!CONTRIBUTION_TYPES.includes(contribution))
+          throw new Fault(400, "Choose a valid contribution type.");
+        values.contribution_type = contribution;
+      }
+      if ("economic_type" in b) {
+        const economic = text(b.economic_type, 40);
+        if (!ECONOMIC_TYPES.includes(economic))
+          throw new Fault(400, "Choose a valid economic treatment.");
+        values.economic_type = economic;
+      }
     }
     const q = `id=eq.${entry.id}&org_id=eq.${m.org_id}${b.expected_updated_at ? "&updated_at=eq." + encodeURIComponent(b.expected_updated_at) : ""}`,
       rows = await db("hub_work_entries", q, "PATCH", values);
@@ -1610,6 +1719,119 @@ if (action === "tech/home") {
         })),
       );
     return { user_id: target, skill_codes: codes };
+  }
+
+
+  if (action === "capacity/create") {
+    let technician = u.id;
+    if (m.role !== "tech" && b.technician_user_id)
+      technician = id(b.technician_user_id);
+    if (
+      m.role === "tech" &&
+      b.technician_user_id &&
+      b.technician_user_id !== u.id
+    )
+      throw new Fault(403, "Technicians can only record their own capacity time.");
+    await activeMemberFor(m, technician);
+    const workDate = text(b.work_date, 10),
+      hours = Number(b.hours),
+      category = text(b.category, 40),
+      creditClass = capacityCreditFor(category);
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(workDate) ||
+      !Number.isFinite(new Date(workDate + "T12:00:00Z").getTime())
+    )
+      throw new Fault(400, "Choose a valid work date.");
+    if (!Number.isFinite(hours) || hours <= 0 || hours > 24)
+      throw new Fault(400, "Enter capacity hours between 0 and 24.");
+    if (!creditClass)
+      throw new Fault(400, "Choose a valid capacity category.");
+    let project:any = null,
+      task:any = null;
+    if (b.project_id) project = await projectFor(m, id(b.project_id));
+    if (b.task_id) {
+      task = await taskFor(m, id(b.task_id));
+      if (!project || task.project_id !== project.id)
+        throw new Fault(400, "Capacity task and project do not match.");
+    }
+    return await db("hub_capacity_entries", "", "POST", {
+      org_id: m.org_id,
+      technician_user_id: technician,
+      project_id: project?.id || null,
+      task_id: task?.id || null,
+      work_date: workDate,
+      hours: Math.round(hours * 100) / 100,
+      category,
+      credit_class: creditClass,
+      notes: text(b.notes, 4000),
+      review_status: "pending_review",
+      source: technician === u.id ? "self" : "manager",
+      created_by: u.id,
+      updated_by: u.id,
+      approved_by: null,
+      approved_at: null,
+      manager_note: "",
+    });
+  }
+  if (action === "capacity/update") {
+    const entry = await one(
+      "hub_capacity_entries",
+      `id=eq.${id(b.id)}&org_id=eq.${m.org_id}`,
+    );
+    if (!entry) throw new Fault(404, "Capacity entry unavailable.");
+    const isManager = ["owner", "manager"].includes(m.role);
+    if (
+      !isManager &&
+      (entry.technician_user_id !== u.id || entry.review_status !== "pending_review")
+    )
+      throw new Fault(403, "This capacity entry requires manager review.");
+    const values:any = {
+      updated_by: u.id,
+      updated_at: new Date().toISOString(),
+    };
+    if (entry.review_status === "pending_review" || isManager) {
+      if ("hours" in b) {
+        const hours = Number(b.hours);
+        if (!Number.isFinite(hours) || hours <= 0 || hours > 24)
+          throw new Fault(400, "Enter capacity hours between 0 and 24.");
+        values.hours = Math.round(hours * 100) / 100;
+      }
+      if ("category" in b) {
+        const category = text(b.category, 40),
+          creditClass = capacityCreditFor(category);
+        if (!creditClass)
+          throw new Fault(400, "Choose a valid capacity category.");
+        values.category = category;
+        values.credit_class = creditClass;
+      }
+      if ("notes" in b) values.notes = text(b.notes, 4000);
+    }
+    if (isManager) {
+      if ("manager_note" in b)
+        values.manager_note = text(b.manager_note, 2000);
+      if ("review_status" in b) {
+        const status = text(b.review_status, 30);
+        if (!["pending_review", "approved", "void"].includes(status))
+          throw new Fault(400, "Choose a valid capacity review status.");
+        values.review_status = status;
+        if (status === "approved") {
+          values.approved_by = u.id;
+          values.approved_at = new Date().toISOString();
+        } else {
+          values.approved_by = null;
+          values.approved_at = null;
+        }
+      }
+    }
+    const q =
+      `id=eq.${entry.id}&org_id=eq.${m.org_id}${b.expected_updated_at ? "&updated_at=eq." + encodeURIComponent(b.expected_updated_at) : ""}`,
+      rows = await db("hub_capacity_entries", q, "PATCH", values);
+    if (!rows.length)
+      throw new Fault(
+        409,
+        "This capacity entry changed on another device. Refresh before saving.",
+      );
+    return rows[0];
   }
 
   if (action === "parts/create") {
