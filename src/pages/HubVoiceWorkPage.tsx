@@ -381,9 +381,10 @@ export function HubVoiceWorkPage({ demoMode = false }: { demoMode?: boolean }) {
     <div className="min-h-full bg-[#f4f3ee] px-4 py-5 pb-28">
       <div className="mx-auto max-w-2xl space-y-4">
         {demoMode && (
-          <nav className="grid grid-cols-3 gap-2 rounded-xl bg-white p-2 text-xs font-bold shadow-sm">
+          <nav className="grid grid-cols-4 gap-2 rounded-xl bg-white p-2 text-xs font-bold shadow-sm">
             <a href="/review/hub/pilot" className="rounded-lg px-2 py-2 text-center text-stone-700">Tech Home</a>
             <a href="/review/hub/add-work" className="rounded-lg bg-stone-950 px-2 py-2 text-center text-white">Add Work</a>
+            <a href="/review/hub/photos" className="rounded-lg px-2 py-2 text-center text-stone-700">Photos</a>
             <a href="/review/hub/manage" className="rounded-lg px-2 py-2 text-center text-stone-700">Management</a>
           </nav>
         )}
