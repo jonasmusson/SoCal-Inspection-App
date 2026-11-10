@@ -45,6 +45,19 @@ async function fetchProfileWithRetry(userId: string): Promise<UserProfile | null
   return null;
 }
 
+// With detectSessionInUrl disabled, the Supabase client does NOT parse the
+// URL hash automatically. We do it ourselves so we can detect recovery links
+// and establish the session at the right time (after the listener is set up).
+function parseHashParams(): Record<string, string> {
+  const hash = window.location.hash.replace(/^#/, '');
+  const params: Record<string, string> = {};
+  for (const pair of hash.split('&')) {
+    const [key, value] = pair.split('=');
+    if (key) params[decodeURIComponent(key)] = decodeURIComponent(value ?? '');
+  }
+  return params;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -70,9 +83,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // onAuthStateChange emits INITIAL_SESSION from local storage without competing
-    // for the same cross-tab auth lock as getSession(). Keeping this callback
-    // synchronous also prevents signInWithPassword from waiting on profile I/O.
+    // Check if the current URL is a password-recovery link.
+    const hashParams = parseHashParams();
+    const isRecoveryLink = hashParams.type === 'recovery' && !!hashParams.access_token;
+
+    if (isRecoveryLink) {
+      setIsPasswordRecovery(true);
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         if (!mounted) return;
@@ -85,6 +103,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
+          // During password recovery, skip profile loading — just show the
+          // reset screen so the user can set a new password.
+          if (event === 'PASSWORD_RECOVERY') {
+            setLoading(false);
+            return;
+          }
           setLoading(true);
           const userId = newSession.user.id;
           const generation = ++authGeneration.current;
@@ -101,6 +125,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     );
+
+    if (isRecoveryLink) {
+      // With detectSessionInUrl disabled, the Supabase client won't parse
+      // the URL hash on its own. We manually feed the tokens from the hash
+      // into the client so it establishes a valid session — which fires the
+      // PASSWORD_RECOVERY event to our listener above, and gives
+      // supabase.auth.updateUser() a session to work with on submit.
+      const { access_token, refresh_token } = hashParams;
+      if (access_token && refresh_token) {
+        supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        }).then(({ data }) => {
+          if (!mounted) return;
+          if (data.session) {
+            setSession(data.session);
+            setUser(data.session.user);
+          }
+          setLoading(false);
+        }).catch(() => {
+          if (mounted) setLoading(false);
+        });
+      } else {
+        setLoading(false);
+      }
+      // Clean the hash from the URL so it doesn't linger after reload
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
 
     const timeout = setTimeout(() => {
       if (mounted) setLoading(false);
