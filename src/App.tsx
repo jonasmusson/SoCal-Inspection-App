@@ -17,6 +17,7 @@ import { CheckInPage } from './pages/CheckInPage';
 import { PublicReportPage } from './pages/PublicReportPage';
 import { HubVoiceWorkPage } from './pages/HubVoiceWorkPage';
 import { HubPilotPage } from './pages/HubPilotPage';
+import { HubManagementPilotPage } from './pages/HubManagementPilotPage';
 import { supabase, supabaseConfigured } from './lib/supabase';
 import { Clock, LogOut } from 'lucide-react';
 
@@ -102,6 +103,10 @@ function AppRoutes() {
     return <Routes><Route path="/review/hub/pilot" element={<HubPilotPage demoMode />} /></Routes>;
   }
 
+  if (location.pathname === '/review/hub/manage') {
+    return <Routes><Route path="/review/hub/manage" element={<HubManagementPilotPage demoMode />} /></Routes>;
+  }
+
   if (loading) return <LoadingScreen />;
 
   if (isPasswordRecovery) {
@@ -131,6 +136,7 @@ function AppRoutes() {
         <Route path="/dashboard" element={isManager || isOwner ? <DashboardPage /> : <Navigate to="/my-inspections" replace />} />
         <Route path="/my-inspections" element={<MyInspectionsPage />} />
         <Route path="/hub/pilot" element={<HubPilotPage />} />
+        <Route path="/hub/manage" element={isManager || isOwner ? <HubManagementPilotPage /> : <Navigate to="/hub/pilot" replace />} />
         <Route path="/hub/add-work" element={<HubVoiceWorkPage />} />
         <Route path="/checkin" element={isManager || isOwner ? <CheckInPage /> : <Navigate to="/my-inspections" replace />} />
         <Route path="/inspection/:id" element={<InspectionDetailPage />} />
@@ -149,7 +155,8 @@ function AppRoutes() {
 function App() {
   const reviewDemo = typeof window !== 'undefined' && (
     window.location.pathname === '/review/hub/add-work' ||
-    window.location.pathname === '/review/hub/pilot'
+    window.location.pathname === '/review/hub/pilot' ||
+    window.location.pathname === '/review/hub/manage'
   );
   if (!supabaseConfigured && !reviewDemo) {
     return (
