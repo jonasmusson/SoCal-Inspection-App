@@ -141,4 +141,19 @@ select
   to_regclass('public.hub_parts_requests') as existing_parts_requests,
   to_regclass('public.hub_clipboard_intakes') as existing_clipboard_intakes,
   to_regclass('public.hub_shopmonkey_project_links') as existing_shopmonkey_links,
-  to_regclass('public.hub_work_sessions') as existing_work_sessions;
+  to_regclass('public.hub_work_sessions') as existing_work_sessions,
+  to_regclass('public.hub_capacity_entries') as existing_capacity_entries;
+
+-- 11. Contribution/Capacity is additive. Before its migration, these columns
+-- should not already exist under a conflicting/manual implementation.
+select
+  exists(
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='hub_pilot_projects'
+      and column_name in ('contribution_default','economic_default')
+  ) as existing_project_contribution_columns,
+  exists(
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='hub_work_entries'
+      and column_name in ('contribution_type','economic_type')
+  ) as existing_work_contribution_columns;
