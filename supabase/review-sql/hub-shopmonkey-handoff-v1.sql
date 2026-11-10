@@ -21,6 +21,24 @@ create table if not exists public.hub_shopmonkey_project_links (
 create unique index if not exists hub_shopmonkey_order_unique
   on public.hub_shopmonkey_project_links (org_id, remote_order_id);
 
+
+create table if not exists public.hub_shopmonkey_service_links (
+  org_id uuid not null references public.hub_pilot_orgs(id) on delete cascade,
+  project_id uuid not null references public.hub_pilot_projects(id) on delete cascade,
+  system text not null
+    check (system in ('Engine','Transmission','Suspension','Brakes','Electrical','Body / Paint','Interior','Wheels / Tires','General','Other')),
+  remote_order_id text not null,
+  remote_service_id text not null,
+  remote_service_name text not null default '',
+  verified_by uuid not null references auth.users(id),
+  verified_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (project_id, system)
+);
+
+create unique index if not exists hub_shopmonkey_service_remote_unique
+  on public.hub_shopmonkey_service_links (org_id, remote_order_id, remote_service_id);
+
 create table if not exists public.hub_shopmonkey_sync_runs (
   id uuid primary key,
   org_id uuid not null references public.hub_pilot_orgs(id) on delete cascade,
@@ -60,15 +78,19 @@ create index if not exists hub_shopmonkey_work_links_project_idx
   on public.hub_shopmonkey_work_links (project_id, synced_at desc);
 
 alter table public.hub_shopmonkey_project_links enable row level security;
+alter table public.hub_shopmonkey_service_links enable row level security;
 alter table public.hub_shopmonkey_sync_runs enable row level security;
 alter table public.hub_shopmonkey_work_links enable row level security;
 
 revoke all on table public.hub_shopmonkey_project_links from anon, authenticated;
+revoke all on table public.hub_shopmonkey_service_links from anon, authenticated;
 revoke all on table public.hub_shopmonkey_sync_runs from anon, authenticated;
 revoke all on table public.hub_shopmonkey_work_links from anon, authenticated;
 
 comment on table public.hub_shopmonkey_project_links is
   'Owner-verified HUB project to Shopmonkey Order ID mapping. Human order number is reference only.';
+comment on table public.hub_shopmonkey_service_links is
+  'Verified reusable Shopmonkey service section for one HUB project/system. Prevents duplicate service headings across sync batches.';
 comment on table public.hub_shopmonkey_sync_runs is
   'Durable owner-approved outbound Shopmonkey write attempt and result.';
 comment on table public.hub_shopmonkey_work_links is
