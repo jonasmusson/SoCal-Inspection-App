@@ -47,6 +47,12 @@ function newDraftMediaId() {
   return `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function preferNativeVideoCapture() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+}
+
 export function CheckInPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -83,6 +89,8 @@ export function CheckInPage() {
   const [customModel, setCustomModel] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showVideoRecorder, setShowVideoRecorder] = useState(false);
+  const [nativeVideoCapture] = useState(preferNativeVideoCapture);
+  const videoCaptureInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => { loadInit(); }, []);
   useEffect(() => {
@@ -156,23 +164,7 @@ export function CheckInPage() {
   useEffect(() => {
     if (!draftReady || !profile?.id || success) return;
     const timer = window.setTimeout(() => {
-      const draft: CheckinDraftState<typeof form> = {
-        version: 1,
-        saved_at: Date.now(),
-        step,
-        form,
-        assigned_tech_id: assignedTechId,
-        custom_make: customMake,
-        custom_model: customModel,
-        photo_ids: localPhotos.map(photo => photo.id),
-        video_id: localVideoId,
-      };
-      try {
-        saveCheckinDraftState(profile.id, draft);
-        setDraftSavedAt(new Date(draft.saved_at));
-      } catch {
-        setDraftWarning('This device could not autosave the check-in details. Keep the app open until the inspection is created.');
-      }
+      persistDraftNow();
     }, 250);
     return () => window.clearTimeout(timer);
   }, [
@@ -209,6 +201,27 @@ export function CheckInPage() {
       setInitError(true);
     } finally {
       setInitLoading(false);
+    }
+  }
+
+  function persistDraftNow() {
+    if (!profile?.id || success) return;
+    const draft: CheckinDraftState<typeof form> = {
+      version: 1,
+      saved_at: Date.now(),
+      step,
+      form,
+      assigned_tech_id: assignedTechId,
+      custom_make: customMake,
+      custom_model: customModel,
+      photo_ids: localPhotos.map(photo => photo.id),
+      video_id: localVideoId,
+    };
+    try {
+      saveCheckinDraftState(profile.id, draft);
+      setDraftSavedAt(new Date(draft.saved_at));
+    } catch {
+      setDraftWarning('This device could not autosave the check-in details. Keep the app open until the inspection is created.');
     }
   }
 
@@ -875,7 +888,9 @@ export function CheckInPage() {
                   {localVideo ? 'Recorded' : videoRequired ? 'Required' : 'Optional'}
                 </span>
               </div>
-              <SectionHelp text="Record a full walk-around to capture any pre-existing dents, scratches, or damage on all sides." />
+              <SectionHelp text={nativeVideoCapture
+                ? "Record a full walk-around with the iPhone camera. Your check-in draft is saved before the camera opens so it can recover if the browser reloads."
+                : "Record a full walk-around to capture any pre-existing dents, scratches, or damage on all sides."} />
 
               {localVideo && (
                 <div className="mt-3 mb-3 p-3 bg-success-50 border border-success-200 rounded-xl flex items-center gap-3">
@@ -898,10 +913,26 @@ export function CheckInPage() {
               )}
 
               <div className="grid grid-cols-2 gap-2 mt-3">
-                <button type="button" onClick={() => setShowVideoRecorder(true)}
+                <button type="button"
+                  onClick={() => {
+                    persistDraftNow();
+                    if (nativeVideoCapture) videoCaptureInputRef.current?.click();
+                    else setShowVideoRecorder(true);
+                  }}
                   className="flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 justify-center hover:bg-gray-50">
                   <Video className="w-4 h-4" /> {localVideo ? 'Re-record' : 'Record Video'}
                 </button>
+                <input
+                  ref={videoCaptureInputRef}
+                  type="file"
+                  accept="video/*"
+                  capture="environment"
+                  className="sr-only"
+                  onChange={e => {
+                    void handleVideoUpload(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
                 <label className={`flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border justify-center cursor-pointer ${
                   !localVideo && videoRequired ? 'border-primary-400 text-primary-600 bg-primary-50 hover:bg-primary-100' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                 }`}>
