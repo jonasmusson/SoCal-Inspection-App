@@ -549,7 +549,7 @@ async function endpoint(
   if (action === "tech/home") {
     const assignments = await db(
         "hub_vehicle_assignments",
-        \`org_id=eq.\${m.org_id}&user_id=eq.\${u.id}\`,
+        `org_id=eq.${m.org_id}&user_id=eq.${u.id}`,
       ),
       vehicleIds = assignments.map((row:any)=>row.vehicle_id),
       vehicleScope = vehicleIds.length
@@ -559,31 +559,31 @@ async function endpoint(
         await Promise.all([
           one(
             "hub_timecard_shifts",
-            \`org_id=eq.\${m.org_id}&user_id=eq.\${u.id}&clock_out=is.null&order=clock_in.desc\`,
+            `org_id=eq.${m.org_id}&user_id=eq.${u.id}&clock_out=is.null&order=clock_in.desc`,
           ),
           one(
             "hub_work_sessions",
-            \`org_id=eq.\${m.org_id}&technician_user_id=eq.\${u.id}&status=eq.active&order=started_at.desc\`,
+            `org_id=eq.${m.org_id}&technician_user_id=eq.${u.id}&status=eq.active&order=started_at.desc`,
           ),
           db(
             "hub_project_tasks",
-            \`org_id=eq.\${m.org_id}&assigned_user_id=eq.\${u.id}&status=in.(todo,in_progress,waiting,blocked)&order=created_at.asc&limit=500\`,
+            `org_id=eq.${m.org_id}&assigned_user_id=eq.${u.id}&status=in.(todo,in_progress,waiting,blocked)&order=created_at.asc&limit=500`,
           ),
           db(
             "hub_project_tasks",
-            \`org_id=eq.\${m.org_id}&vehicle_id=in.(\${vehicleScope})&assigned_user_id=is.null&status=eq.todo&order=created_at.asc&limit=500\`,
+            `org_id=eq.${m.org_id}&vehicle_id=in.(${vehicleScope})&assigned_user_id=is.null&status=eq.todo&order=created_at.asc&limit=500`,
           ),
           db(
             "hub_member_task_skills",
-            \`org_id=eq.\${m.org_id}&user_id=eq.\${u.id}&order=skill_code.asc\`,
+            `org_id=eq.${m.org_id}&user_id=eq.${u.id}&order=skill_code.asc`,
           ),
           db(
             "hub_parts_requests",
-            \`org_id=eq.\${m.org_id}&requested_by=eq.\${u.id}&status=in.(requested,ordered)&order=created_at.desc&limit=100\`,
+            `org_id=eq.${m.org_id}&requested_by=eq.${u.id}&status=in.(requested,ordered)&order=created_at.desc&limit=100`,
           ),
           db(
             "hub_work_entries",
-            \`org_id=eq.\${m.org_id}&technician_user_id=eq.\${u.id}&status=eq.pending_review&order=work_date.desc,created_at.desc&limit=100\`,
+            `org_id=eq.${m.org_id}&technician_user_id=eq.${u.id}&status=eq.pending_review&order=work_date.desc,created_at.desc&limit=100`,
           ),
         ]),
       skillSet = new Set(skills.map((row:any)=>row.skill_code)),
@@ -606,7 +606,7 @@ async function endpoint(
       projects = projectIds.length
         ? await db(
             "hub_pilot_projects",
-            \`org_id=eq.\${m.org_id}&id=in.(\${projectIds.join(",")})&select=id,vehicle_id,title,status,shopmonkey_order_ref\`,
+            `org_id=eq.${m.org_id}&id=in.(${projectIds.join(",")})&select=id,vehicle_id,title,status,shopmonkey_order_ref`,
           )
         : [],
       projectById = new Map(projects.map((row:any)=>[row.id,row])),
@@ -614,7 +614,7 @@ async function endpoint(
       vehicles = projectVehicleIds.length
         ? await db(
             "hub_pilot_vehicles",
-            \`org_id=eq.\${m.org_id}&id=in.(\${projectVehicleIds.join(",")})&select=id,display_name,year,make,model\`,
+            `org_id=eq.${m.org_id}&id=in.(${projectVehicleIds.join(",")})&select=id,display_name,year,make,model`,
           )
         : [],
       vehicleById = new Map(vehicles.map((row:any)=>[row.id,row])),
@@ -694,7 +694,7 @@ async function endpoint(
       throw new Fault(403, "This vehicle is not assigned to you.");
     const rows = await db(
       "hub_project_tasks",
-      \`id=eq.\${task.id}&org_id=eq.\${m.org_id}&assigned_user_id=is.null&status=eq.todo&updated_at=eq.\${encodeURIComponent(task.updated_at)}\`,
+      `id=eq.${task.id}&org_id=eq.${m.org_id}&assigned_user_id=is.null&status=eq.todo&updated_at=eq.${encodeURIComponent(task.updated_at)}`,
       "PATCH",
       {
         assigned_user_id:u.id,
