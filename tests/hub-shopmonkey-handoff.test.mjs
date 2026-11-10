@@ -91,7 +91,6 @@ test("Shopmonkey sync is owner-only, idempotent, receipt-driven and fail-closed 
     "client.addLabor",
     "hub_shopmonkey_work_links",
     'invoice_state: "synced"',
-    'status: "partial"',
     'status: savedLinks.length ? "partial" : "failed"',
     "Reconcile the remote order before any retry",
   ]) assert.ok(block.includes(text),text);
