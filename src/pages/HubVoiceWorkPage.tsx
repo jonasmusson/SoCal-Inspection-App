@@ -362,6 +362,13 @@ export function HubVoiceWorkPage({ demoMode = false }: { demoMode?: boolean }) {
   return (
     <div className="min-h-full bg-[#f4f3ee] px-4 py-5 pb-28">
       <div className="mx-auto max-w-2xl space-y-4">
+        {demoMode && (
+          <nav className="grid grid-cols-3 gap-2 rounded-xl bg-white p-2 text-xs font-bold shadow-sm">
+            <a href="/review/hub/pilot" className="rounded-lg px-2 py-2 text-center text-stone-700">Tech Home</a>
+            <a href="/review/hub/add-work" className="rounded-lg bg-stone-950 px-2 py-2 text-center text-white">Add Work</a>
+            <a href="/review/hub/manage" className="rounded-lg px-2 py-2 text-center text-stone-700">Management</a>
+          </nav>
+        )}
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-800">SoCal Workshop · Add Work</p>
