@@ -1279,6 +1279,67 @@ async function endpoint(
       },
     };
   }
+
+  if (action === "shopmonkey/service/link") {
+    management(m, true);
+    const p = await projectFor(m, id(b.project_id)),
+      system = text(b.system, 40),
+      remoteServiceId = text(b.remote_service_id, 128),
+      orderLink = await one(
+        "hub_shopmonkey_project_links",
+        \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}\`,
+      );
+    if (!orderLink)
+      throw new Fault(409, "Verify the Shopmonkey Order ID for this project first.");
+    if (!WORK_SYSTEMS.includes(system))
+      throw new Fault(400, "Choose a valid project system.");
+    if (!remoteServiceId)
+      throw new Fault(400, "Shopmonkey Service ID is required.");
+    let services:any[];
+    try {
+      services = await shopmonkeyClient().services(orderLink.remote_order_id);
+    } catch (error) {
+      if (error instanceof ShopmonkeyWriteError)
+        throw new Fault(
+          error.status === 429 ? 429 : 502,
+          error.status === 429
+            ? "Shopmonkey rate limit reached. Retry later."
+            : "Shopmonkey services could not be verified.",
+        );
+      throw new Fault(502, "Shopmonkey services could not be verified.");
+    }
+    const remote = services.find(
+      (row:any) => String(row.id || "") === remoteServiceId,
+    );
+    if (!remote)
+      throw new Fault(404, "That Shopmonkey service was not found on the linked order.");
+    const existing = await one(
+      "hub_shopmonkey_service_links",
+      \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}&system=eq.\${encodeURIComponent(system)}\`,
+    );
+    const values = {
+      org_id: m.org_id,
+      remote_order_id: orderLink.remote_order_id,
+      remote_service_id: remoteServiceId,
+      remote_service_name: text(remote.name || system, 300),
+      verified_by: u.id,
+      verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const rows = existing
+      ? await db(
+          "hub_shopmonkey_service_links",
+          \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}&system=eq.\${encodeURIComponent(system)}\`,
+          "PATCH",
+          values,
+        )
+      : await db("hub_shopmonkey_service_links", "", "POST", {
+          project_id: p.id,
+          system,
+          ...values,
+        });
+    return { link: rows[0] };
+  }
   if (action === "shopmonkey/preview") {
     management(m);
     const p = await projectFor(m, id(url.searchParams.get("project_id"))),
