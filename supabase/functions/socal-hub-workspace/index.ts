@@ -2,7 +2,7 @@
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
-const VERSION = "0.11.0",
+const VERSION = "0.12.0",
   BUCKET = "hub-pilot-private",
   ARCHIVE = "hub-media-archive";
 const MIME: Record<string, string> = {
@@ -60,6 +60,16 @@ const text = (x: unknown, n = 160) =>
       .trim()
       .slice(0, n),
   path = (x: string) => x.split("/").map(encodeURIComponent).join("/");
+const shopDate = (value = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: string) => parts.find((x) => x.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+};
 const sha = async (b: ArrayBuffer) =>
   Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b)))
     .map((x) => x.toString(16).padStart(2, "0"))
@@ -346,6 +356,7 @@ async function endpoint(
       profile,
       work_entries,
       project_tasks,
+      timecards,
     ] = await Promise.all([
       db("hub_pilot_projects", scope + "&order=created_at.asc&limit=500"),
       db("hub_pilot_media", scope + "&order=created_at.desc&limit=500"),
@@ -371,6 +382,10 @@ async function endpoint(
         "hub_project_tasks",
         scope + "&order=project_id.asc,sort_order.asc,created_at.asc&limit=2000",
       ),
+      db(
+        "hub_timecard_shifts",
+        `org_id=eq.${m.org_id}${m.role === "tech" ? "&user_id=eq." + m.user_id : ""}&order=work_date.desc,clock_in.desc&limit=2000`,
+      ),
     ]);
     const techIds = [
         ...new Set(work_entries.map((x: any) => x.technician_user_id)),
@@ -395,6 +410,7 @@ async function endpoint(
       contacts,
       work_entries,
       project_tasks,
+      timecards,
       work_profiles,
       work_systems: WORK_SYSTEMS,
       task_statuses: TASK_STATUSES,
@@ -900,6 +916,149 @@ async function endpoint(
       throw new Fault(
         409,
         "This work entry changed on another device. Refresh before saving.",
+      );
+    return rows[0];
+  }
+
+  if (action === "timeclock/punch") {
+    const operation = text(b.operation, 20);
+    if (!["clock_in", "clock_out"].includes(operation))
+      throw new Fault(400, "Choose Clock In or Clock Out.");
+    let target = u.id;
+    if (b.user_id && b.user_id !== u.id) {
+      management(m);
+      target = id(b.user_id);
+    }
+    await activeMemberFor(m, target);
+    const open = await one(
+      "hub_timecard_shifts",
+      `org_id=eq.${m.org_id}&user_id=eq.${target}&clock_out=is.null&order=clock_in.desc`,
+    );
+    if (operation === "clock_in") {
+      if (open) throw new Fault(409, "This team member is already clocked in.");
+      const now = new Date();
+      return await db("hub_timecard_shifts", "", "POST", {
+        org_id: m.org_id,
+        user_id: target,
+        work_date: shopDate(now),
+        clock_in: now.toISOString(),
+        break_minutes: 0,
+        notes: text(b.notes, 2000),
+        manager_note: "",
+        source: target === u.id ? "self" : "manager",
+        created_by: u.id,
+        updated_by: u.id,
+      });
+    }
+    if (!open) throw new Fault(409, "This team member is not clocked in.");
+    const now = new Date(),
+      elapsedMinutes = Math.floor(
+        (now.getTime() - new Date(open.clock_in).getTime()) / 60000,
+      ),
+      breakMinutes =
+        b.break_minutes === undefined
+          ? Number(open.break_minutes || 0)
+          : Number(b.break_minutes);
+    if (elapsedMinutes < 0 || elapsedMinutes > 18 * 60)
+      throw new Fault(
+        409,
+        "This open shift needs manager correction before it can be clocked out.",
+      );
+    if (
+      !Number.isInteger(breakMinutes) ||
+      breakMinutes < 0 ||
+      breakMinutes > Math.min(720, elapsedMinutes)
+    )
+      throw new Fault(400, "Break minutes are invalid for this shift.");
+    const rows = await db(
+      "hub_timecard_shifts",
+      `id=eq.${open.id}&org_id=eq.${m.org_id}&clock_out=is.null&updated_at=eq.${encodeURIComponent(open.updated_at)}`,
+      "PATCH",
+      {
+        clock_out: now.toISOString(),
+        break_minutes: breakMinutes,
+        notes: "notes" in b ? text(b.notes, 2000) : open.notes,
+        updated_by: u.id,
+        updated_at: now.toISOString(),
+      },
+    );
+    if (!rows.length)
+      throw new Fault(
+        409,
+        "This timecard changed on another device. Refresh before clocking out.",
+      );
+    return rows[0];
+  }
+  if (action === "timecard/update") {
+    management(m);
+    const shift = await one(
+      "hub_timecard_shifts",
+      `id=eq.${id(b.id)}&org_id=eq.${m.org_id}`,
+    );
+    if (!shift) throw new Fault(404, "Timecard shift unavailable.");
+    await activeMemberFor(m, shift.user_id);
+    const values: any = {
+      updated_by: u.id,
+      updated_at: new Date().toISOString(),
+      source: "manager",
+    };
+    if ("work_date" in b) {
+      const workDate = text(b.work_date, 10);
+      if (
+        !/^\\d{4}-\\d{2}-\\d{2}$/.test(workDate) ||
+        !Number.isFinite(new Date(workDate + "T12:00:00Z").getTime())
+      )
+        throw new Fault(400, "Choose a valid work date.");
+      values.work_date = workDate;
+    }
+    const parseTimestamp = (value: unknown, label: string) => {
+      if (value === null || value === "") return null;
+      const parsed = new Date(String(value));
+      if (!Number.isFinite(parsed.getTime()))
+        throw new Fault(400, "Choose a valid " + label + ".");
+      return parsed.toISOString();
+    };
+    const nextIn =
+        "clock_in" in b ? parseTimestamp(b.clock_in, "clock-in time") : shift.clock_in,
+      nextOut =
+        "clock_out" in b
+          ? parseTimestamp(b.clock_out, "clock-out time")
+          : shift.clock_out;
+    if (!nextIn) throw new Fault(400, "Clock-in time is required.");
+    if (nextOut) {
+      const elapsed = new Date(nextOut).getTime() - new Date(nextIn).getTime();
+      if (elapsed < 0 || elapsed > 18 * 60 * 60 * 1000)
+        throw new Fault(400, "Completed shifts must be between 0 and 18 hours.");
+    }
+    if ("clock_in" in b) values.clock_in = nextIn;
+    if ("clock_out" in b) values.clock_out = nextOut;
+    if ("break_minutes" in b) {
+      const minutes = Number(b.break_minutes);
+      const elapsedMinutes = nextOut
+        ? Math.floor(
+            (new Date(nextOut).getTime() - new Date(nextIn).getTime()) / 60000,
+          )
+        : 18 * 60;
+      if (
+        !Number.isInteger(minutes) ||
+        minutes < 0 ||
+        minutes > Math.min(720, Math.max(0, elapsedMinutes))
+      )
+        throw new Fault(400, "Break minutes are invalid for this shift.");
+      values.break_minutes = minutes;
+    }
+    if ("notes" in b) values.notes = text(b.notes, 2000);
+    if ("manager_note" in b) values.manager_note = text(b.manager_note, 2000);
+    const rows = await db(
+      "hub_timecard_shifts",
+      `id=eq.${shift.id}&org_id=eq.${m.org_id}${b.expected_updated_at ? "&updated_at=eq." + encodeURIComponent(b.expected_updated_at) : ""}`,
+      "PATCH",
+      values,
+    );
+    if (!rows.length)
+      throw new Fault(
+        409,
+        "This timecard changed on another device. Refresh before saving.",
       );
     return rows[0];
   }
