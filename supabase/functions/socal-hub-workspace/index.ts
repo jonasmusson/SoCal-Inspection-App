@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
