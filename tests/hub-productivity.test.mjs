@@ -74,4 +74,8 @@ test("Management dashboard includes work-queue bottlenecks",()=>{
   ]) assert.ok(summary.includes(text),text);
 });
 
-test("Labor value and contribution analytics are explicitly not accounting truth",()=>{\n  const source=read("supabase/functions/socal-hub-workspace/index.ts");\n  assert.ok(source.includes("Labor value is not an invoice, payment or accounting total."));\n  assert.ok(source.includes("Attendance, contribution, capacity allocation, constraints and billing remain separate facts."));\n});
+test("Labor value and contribution analytics are explicitly not accounting truth",()=>{
+  const source=read("supabase/functions/socal-hub-workspace/index.ts");
+  assert.ok(source.includes("Labor value is not an invoice, payment or accounting total."));
+  assert.ok(source.includes("Attendance, contribution, capacity allocation, constraints and billing remain separate facts."));
+});
