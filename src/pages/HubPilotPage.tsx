@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock, Mic, Package, Play, Plus, RefreshCw, Save, Square, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { hubWorkspace, HubWorkspaceError } from '../lib/hubWorkspace';
+import { hubWorkspace } from '../lib/hubWorkspace';
 
 type Task = {
   id: string;
