@@ -1287,7 +1287,7 @@ async function endpoint(
       remoteServiceId = text(b.remote_service_id, 128),
       orderLink = await one(
         "hub_shopmonkey_project_links",
-        \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}\`,
+        `project_id=eq.${p.id}&org_id=eq.${m.org_id}`,
       );
     if (!orderLink)
       throw new Fault(409, "Verify the Shopmonkey Order ID for this project first.");
@@ -1315,7 +1315,7 @@ async function endpoint(
       throw new Fault(404, "That Shopmonkey service was not found on the linked order.");
     const existing = await one(
       "hub_shopmonkey_service_links",
-      \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}&system=eq.\${encodeURIComponent(system)}\`,
+      `project_id=eq.${p.id}&org_id=eq.${m.org_id}&system=eq.${encodeURIComponent(system)}`,
     );
     const values = {
       org_id: m.org_id,
@@ -1329,7 +1329,7 @@ async function endpoint(
     const rows = existing
       ? await db(
           "hub_shopmonkey_service_links",
-          \`project_id=eq.\${p.id}&org_id=eq.\${m.org_id}&system=eq.\${encodeURIComponent(system)}\`,
+          `project_id=eq.${p.id}&org_id=eq.${m.org_id}&system=eq.${encodeURIComponent(system)}`,
           "PATCH",
           values,
         )
