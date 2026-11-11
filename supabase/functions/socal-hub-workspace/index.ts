@@ -2,7 +2,7 @@
 const ORIGIN = Deno.env.get("SUPABASE_URL")!,
   SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   PUBLIC = Deno.env.get("SUPABASE_ANON_KEY")!;
-const VERSION = "0.10.0",
+const VERSION = "0.11.0",
   BUCKET = "hub-pilot-private",
   ARCHIVE = "hub-media-archive";
 const MIME: Record<string, string> = {
@@ -24,6 +24,9 @@ const CATEGORIES = [
   "Inspection",
   "Other",
 ];
+const TASK_STATUSES = ["todo", "in_progress", "waiting", "blocked", "done"];
+const TASK_PRIORITIES = ["urgent", "high", "normal", "low"];
+const TASK_SKILLS = ["L1", "L2", "L2S", "L3", "F", "QA"];
 const WORK_SYSTEMS = [
   "Engine",
   "Transmission",
@@ -143,6 +146,31 @@ async function projectFor(m: any, pid: string) {
   if (!p) throw new Fault(404, "Project not available.");
   await vehicleFor(m, p.vehicle_id);
   return p;
+}
+async function taskFor(m: any, tid: string) {
+  const task = await one(
+    "hub_project_tasks",
+    `id=eq.${id(tid)}&org_id=eq.${m.org_id}`,
+  );
+  if (!task) throw new Fault(404, "Project task unavailable.");
+  const project = await projectFor(m, task.project_id);
+  if (project.vehicle_id !== task.vehicle_id)
+    throw new Fault(409, "Project task vehicle scope is invalid.");
+  return task;
+}
+async function activeMemberFor(m: any, userId: string) {
+  const member = await one(
+    "hub_pilot_members",
+    `org_id=eq.${m.org_id}&user_id=eq.${id(userId)}&active=eq.true`,
+  );
+  if (!member) throw new Fault(400, "Choose an active team member.");
+  return member;
+}
+async function assignmentFor(m: any, vehicleId: string, userId: string) {
+  return await one(
+    "hub_vehicle_assignments",
+    `org_id=eq.${m.org_id}&vehicle_id=eq.${id(vehicleId)}&user_id=eq.${id(userId)}`,
+  );
 }
 async function inspectionFor(m: any, pid: string) {
   const p = await projectFor(m, pid),
@@ -317,6 +345,7 @@ async function endpoint(
       org,
       profile,
       work_entries,
+      project_tasks,
     ] = await Promise.all([
       db("hub_pilot_projects", scope + "&order=created_at.asc&limit=500"),
       db("hub_pilot_media", scope + "&order=created_at.desc&limit=500"),
@@ -337,6 +366,10 @@ async function endpoint(
       db(
         "hub_work_entries",
         scope + "&order=work_date.desc,created_at.desc&limit=1000",
+      ),
+      db(
+        "hub_project_tasks",
+        scope + "&order=project_id.asc,sort_order.asc,created_at.asc&limit=2000",
       ),
     ]);
     const techIds = [
@@ -361,8 +394,12 @@ async function endpoint(
       templates,
       contacts,
       work_entries,
+      project_tasks,
       work_profiles,
       work_systems: WORK_SYSTEMS,
+      task_statuses: TASK_STATUSES,
+      task_priorities: TASK_PRIORITIES,
+      task_skills: TASK_SKILLS,
     };
   }
   if (action === "project/create") {
@@ -397,6 +434,136 @@ async function endpoint(
       "PATCH",
       values,
     );
+  }
+
+  if (action === "task/create") {
+    management(m);
+    const p = await projectFor(m, id(b.project_id)),
+      title = text(b.title, 300),
+      status = text(b.status || "todo", 30),
+      priority = text(b.priority || "normal", 30),
+      skill = text(b.skill_code || "L1", 10),
+      estimated = Number(b.estimated_hours ?? 0);
+    if (title.length < 2) throw new Fault(400, "Task name required.");
+    if (!TASK_STATUSES.includes(status))
+      throw new Fault(400, "Choose a valid task status.");
+    if (!TASK_PRIORITIES.includes(priority))
+      throw new Fault(400, "Choose a valid task priority.");
+    if (!TASK_SKILLS.includes(skill))
+      throw new Fault(400, "Choose a valid technician level.");
+    if (!Number.isFinite(estimated) || estimated < 0 || estimated > 250)
+      throw new Fault(400, "Estimated hours must be between 0 and 250.");
+    let assigned: string | null = null,
+      supervisor: string | null = null;
+    if (b.assigned_user_id) {
+      assigned = id(b.assigned_user_id);
+      await activeMemberFor(m, assigned);
+      if (!(await assignmentFor(m, p.vehicle_id, assigned)))
+        throw new Fault(400, "Assigned technician must have access to this vehicle.");
+    }
+    if (b.supervisor_user_id) {
+      supervisor = id(b.supervisor_user_id);
+      const supervisorMember = await activeMemberFor(m, supervisor);
+      if (!["owner", "manager"].includes(supervisorMember.role))
+        throw new Fault(400, "Supervisor must be an active owner or manager.");
+    }
+    const sortOrder = Number.isInteger(b.sort_order) && b.sort_order >= 0
+      ? Math.min(b.sort_order, 100000)
+      : 0;
+    return await db("hub_project_tasks", "", "POST", {
+      org_id: m.org_id,
+      vehicle_id: p.vehicle_id,
+      project_id: p.id,
+      title,
+      status,
+      priority,
+      skill_code: skill,
+      estimated_hours: Math.round(estimated * 100) / 100,
+      assigned_user_id: assigned,
+      supervisor_user_id: supervisor,
+      status_note: text(b.status_note, 2000),
+      notes: text(b.notes, 4000),
+      sort_order: sortOrder,
+      created_by: u.id,
+      updated_by: u.id,
+    });
+  }
+  if (action === "task/update") {
+    const task = await taskFor(m, id(b.id)),
+      isManager = ["owner", "manager"].includes(m.role);
+    if (!isManager && task.assigned_user_id !== u.id)
+      throw new Fault(403, "This task is assigned to another technician.");
+    const values: any = {
+      updated_by: u.id,
+      updated_at: new Date().toISOString(),
+    };
+    if ("status" in b) {
+      const status = text(b.status, 30);
+      if (!TASK_STATUSES.includes(status))
+        throw new Fault(400, "Choose a valid task status.");
+      values.status = status;
+    }
+    if ("status_note" in b) values.status_note = text(b.status_note, 2000);
+    if (isManager) {
+      if ("title" in b) {
+        const title = text(b.title, 300);
+        if (title.length < 2) throw new Fault(400, "Task name required.");
+        values.title = title;
+      }
+      if ("priority" in b) {
+        const priority = text(b.priority, 30);
+        if (!TASK_PRIORITIES.includes(priority))
+          throw new Fault(400, "Choose a valid task priority.");
+        values.priority = priority;
+      }
+      if ("skill_code" in b) {
+        const skill = text(b.skill_code, 10);
+        if (!TASK_SKILLS.includes(skill))
+          throw new Fault(400, "Choose a valid technician level.");
+        values.skill_code = skill;
+      }
+      if ("estimated_hours" in b) {
+        const estimated = Number(b.estimated_hours);
+        if (!Number.isFinite(estimated) || estimated < 0 || estimated > 250)
+          throw new Fault(400, "Estimated hours must be between 0 and 250.");
+        values.estimated_hours = Math.round(estimated * 100) / 100;
+      }
+      if ("assigned_user_id" in b) {
+        if (!b.assigned_user_id) values.assigned_user_id = null;
+        else {
+          const assigned = id(b.assigned_user_id);
+          await activeMemberFor(m, assigned);
+          if (!(await assignmentFor(m, task.vehicle_id, assigned)))
+            throw new Fault(400, "Assigned technician must have access to this vehicle.");
+          values.assigned_user_id = assigned;
+        }
+      }
+      if ("supervisor_user_id" in b) {
+        if (!b.supervisor_user_id) values.supervisor_user_id = null;
+        else {
+          const supervisor = id(b.supervisor_user_id);
+          const supervisorMember = await activeMemberFor(m, supervisor);
+          if (!["owner", "manager"].includes(supervisorMember.role))
+            throw new Fault(400, "Supervisor must be an active owner or manager.");
+          values.supervisor_user_id = supervisor;
+        }
+      }
+      if ("notes" in b) values.notes = text(b.notes, 4000);
+      if ("sort_order" in b) {
+        const sortOrder = Number(b.sort_order);
+        if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 100000)
+          throw new Fault(400, "Task order is invalid.");
+        values.sort_order = sortOrder;
+      }
+    }
+    const q = `id=eq.${task.id}&org_id=eq.${m.org_id}${b.expected_updated_at ? "&updated_at=eq." + encodeURIComponent(b.expected_updated_at) : ""}`,
+      rows = await db("hub_project_tasks", q, "PATCH", values);
+    if (!rows.length)
+      throw new Fault(
+        409,
+        "This task changed on another device. Refresh before saving.",
+      );
+    return rows[0];
   }
   if (action === "vehicle/update") {
     management(m);
@@ -581,10 +748,20 @@ async function endpoint(
   }
   if (action === "work/create") {
     const p = await projectFor(m, id(b.project_id)),
+      task = b.task_id ? await taskFor(m, id(b.task_id)) : null,
       workDate = text(b.work_date, 10),
       system = text(b.system, 40),
       performed = text(b.work_performed, 2000),
       hours = Number(b.actual_hours);
+    if (task && task.project_id !== p.id)
+      throw new Fault(400, "Task and project do not match.");
+    if (
+      m.role === "tech" &&
+      task &&
+      task.assigned_user_id &&
+      task.assigned_user_id !== u.id
+    )
+      throw new Fault(403, "This task is assigned to another technician.");
     if (
       !/^\d{4}-\d{2}-\d{2}$/.test(workDate) ||
       !Number.isFinite(new Date(workDate + "T12:00:00Z").getTime())
@@ -625,6 +802,7 @@ async function endpoint(
       org_id: m.org_id,
       vehicle_id: p.vehicle_id,
       project_id: p.id,
+      task_id: task?.id || null,
       technician_user_id: technician,
       created_by: u.id,
       updated_by: u.id,
