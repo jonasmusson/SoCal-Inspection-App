@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+export type VideoUploadStatus = 'idle' | 'uploading' | 'saved' | 'failed';
 
 export interface CheckinDraftData {
   template_id: string;
@@ -28,10 +29,7 @@ export interface SavedPhoto {
   id: string;
   photo_url: string;
   upload_status: 'uploading' | 'saved' | 'failed';
-}
-
-export interface SavedVideo {
-  video_url: string;
+  has_local_file: boolean;
 }
 
 const EMPTY_DRAFT: CheckinDraftData = {
@@ -45,18 +43,37 @@ const EMPTY_DRAFT: CheckinDraftData = {
   checkin_step: 1,
 };
 
+function hasMinimumMeaningfulData(data: CheckinDraftData): boolean {
+  return !!(
+    data.customer_first_name.trim() ||
+    data.customer_last_name.trim() ||
+    data.customer_phone.trim() ||
+    data.vehicle_make.trim() ||
+    data.vehicle_model.trim()
+  );
+}
+
 export function useCheckinDraft(draftId: string | null) {
   const [draftData, setDraftData] = useState<CheckinDraftData>(EMPTY_DRAFT);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [inspectionId, setInspectionId] = useState<string | null>(draftId);
   const [savedPhotos, setSavedPhotos] = useState<SavedPhoto[]>([]);
   const [savedVideoUrl, setSavedVideoUrl] = useState<string | null>(null);
+  const [videoUploadStatus, setVideoUploadStatus] = useState<VideoUploadStatus>('idle');
   const [draftLoading, setDraftLoading] = useState(!!draftId);
   const [draftError, setDraftError] = useState(false);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>('');
   const pendingFilesRef = useRef<Map<string, File>>(new Map());
+  const saveSeqRef = useRef(0);
+  const lastSavedSeqRef = useRef(0);
+  const draftDataRef = useRef<CheckinDraftData>(EMPTY_DRAFT);
+  const inspectionIdRef = useRef<string | null>(draftId);
+  const createdByRef = useRef<string>('');
+
+  useEffect(() => { draftDataRef.current = draftData; }, [draftData]);
+  useEffect(() => { inspectionIdRef.current = inspectionId; }, [inspectionId]);
 
   // Load existing draft from DB when resuming
   useEffect(() => {
@@ -95,10 +112,11 @@ export function useCheckinDraft(draftId: string | null) {
           checkin_step: (insp.checkin_step as 1 | 2) || 1,
         };
         setDraftData(loaded);
+        draftDataRef.current = loaded;
         lastSavedRef.current = JSON.stringify(loaded);
         setSavedVideoUrl(insp.checkin_video_url || null);
+        setVideoUploadStatus(insp.checkin_video_url ? 'saved' : 'idle');
 
-        // Load saved photos
         const { data: photos } = await supabase
           .from('checkin_photos')
           .select('id, photo_url, upload_status')
@@ -109,6 +127,7 @@ export function useCheckinDraft(draftId: string | null) {
             id: p.id,
             photo_url: p.photo_url,
             upload_status: p.upload_status as SavedPhoto['upload_status'],
+            has_local_file: false,
           })));
         }
       } catch {
@@ -152,6 +171,7 @@ export function useCheckinDraft(draftId: string | null) {
       if (error) return null;
       return id;
     } else {
+      if (!hasMinimumMeaningfulData(data)) return null;
       const { data: created, error } = await supabase
         .from('inspections')
         .insert(payload)
@@ -162,33 +182,97 @@ export function useCheckinDraft(draftId: string | null) {
     }
   }, []);
 
-  // Debounced autosave — called whenever draftData changes
+  const doSave = useCallback(async (data: CheckinDraftData, createdBy: string, seq: number) => {
+    const id = await persist(data, inspectionIdRef.current, createdBy);
+    if (seq < lastSavedSeqRef.current) return;
+    if (id) {
+      setInspectionId(id);
+      inspectionIdRef.current = id;
+      lastSavedRef.current = JSON.stringify(data);
+      lastSavedSeqRef.current = seq;
+      setSaveStatus('saved');
+    } else {
+      setSaveStatus('error');
+    }
+  }, [persist]);
+
   const scheduleSave = useCallback((data: CheckinDraftData, createdBy: string) => {
     const snapshot = JSON.stringify(data);
-    if (snapshot === lastSavedRef.current && inspectionId) return;
+    if (snapshot === lastSavedRef.current && inspectionIdRef.current) return;
 
     setSaveStatus('saving');
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(async () => {
-      const id = await persist(data, inspectionId, createdBy);
-      if (id) {
-        setInspectionId(id);
-        lastSavedRef.current = snapshot;
-        setSaveStatus('saved');
-      } else {
-        setSaveStatus('error');
-      }
+    const seq = ++saveSeqRef.current;
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      doSave(data, createdBy, seq);
     }, 800);
-  }, [inspectionId, persist]);
+  }, [doSave]);
 
-  // Update a single field and trigger autosave
+  const flushSave = useCallback(async (createdBy: string): Promise<string | null> => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const data = draftDataRef.current;
+    const snapshot = JSON.stringify(data);
+    if (snapshot === lastSavedRef.current && inspectionIdRef.current) {
+      return inspectionIdRef.current;
+    }
+    setSaveStatus('saving');
+    const seq = ++saveSeqRef.current;
+    await doSave(data, createdBy, seq);
+    return inspectionIdRef.current;
+  }, [doSave]);
+
+  // Flush on visibility change (phone call, app switch, tab switch)
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === 'hidden') {
+        if (saveTimerRef.current && createdByRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+          const data = draftDataRef.current;
+          if (JSON.stringify(data) !== lastSavedRef.current || !inspectionIdRef.current) {
+            const seq = ++saveSeqRef.current;
+            doSave(data, createdByRef.current, seq);
+          }
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [doSave]);
+
+  // Flush on unmount / beforeunload
+  useEffect(() => {
+    function handleBeforeUnload() {
+      if (saveTimerRef.current && createdByRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+        const data = draftDataRef.current;
+        if (JSON.stringify(data) !== lastSavedRef.current || !inspectionIdRef.current) {
+          const seq = ++saveSeqRef.current;
+          doSave(data, createdByRef.current, seq);
+        }
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      handleBeforeUnload();
+    };
+  }, [doSave]);
+
   const updateField = useCallback(<K extends keyof CheckinDraftData>(
     key: K,
     value: CheckinDraftData[K],
     createdBy: string,
   ) => {
+    createdByRef.current = createdBy;
     setDraftData(prev => {
       const next = { ...prev, [key]: value };
+      draftDataRef.current = next;
       scheduleSave(next, createdBy);
       return next;
     });
@@ -198,19 +282,19 @@ export function useCheckinDraft(draftId: string | null) {
     updates: Partial<CheckinDraftData>,
     createdBy: string,
   ) => {
+    createdByRef.current = createdBy;
     setDraftData(prev => {
       const next = { ...prev, ...updates };
+      draftDataRef.current = next;
       scheduleSave(next, createdBy);
       return next;
     });
   }, [scheduleSave]);
 
-  // Upload a photo to storage + create DB record with status tracking
   const uploadPhoto = useCallback(async (file: File): Promise<void> => {
     if (!inspectionId) return;
     const fileName = `${inspectionId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
 
-    // Create a placeholder record as 'uploading'
     const { data: photoRecord, error: insertErr } = await supabase
       .from('checkin_photos')
       .insert({
@@ -227,6 +311,7 @@ export function useCheckinDraft(draftId: string | null) {
       id: photoRecord.id,
       photo_url: '',
       upload_status: 'uploading',
+      has_local_file: true,
     }]);
 
     const { error: upErr } = await supabase.storage
@@ -238,7 +323,7 @@ export function useCheckinDraft(draftId: string | null) {
         .update({ upload_status: 'failed' })
         .eq('id', photoRecord.id);
       setSavedPhotos(prev => prev.map(p =>
-        p.id === photoRecord.id ? { ...p, upload_status: 'failed' } : p
+        p.id === photoRecord.id ? { ...p, upload_status: 'failed', has_local_file: true } : p
       ));
       return;
     }
@@ -257,17 +342,15 @@ export function useCheckinDraft(draftId: string | null) {
     pendingFilesRef.current.delete(photoRecord.id);
   }, [inspectionId]);
 
-  // Retry a failed photo upload — uses the original stored file if available,
-  // otherwise the caller must pass a replacement File
-  const retryPhotoUpload = useCallback(async (photoId: string, replacementFile?: File): Promise<void> => {
-    if (!inspectionId) return;
+  const retryPhotoUpload = useCallback(async (photoId: string, replacementFile?: File): Promise<boolean> => {
+    if (!inspectionId) return false;
     const file = replacementFile || pendingFilesRef.current.get(photoId);
-    if (!file) return;
+    if (!file) return false;
     const fileName = `${inspectionId}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
 
     pendingFilesRef.current.set(photoId, file);
     setSavedPhotos(prev => prev.map(p =>
-      p.id === photoId ? { ...p, upload_status: 'uploading' } : p
+      p.id === photoId ? { ...p, upload_status: 'uploading', has_local_file: true } : p
     ));
     await supabase.from('checkin_photos')
       .update({ upload_status: 'uploading' })
@@ -284,7 +367,7 @@ export function useCheckinDraft(draftId: string | null) {
       setSavedPhotos(prev => prev.map(p =>
         p.id === photoId ? { ...p, upload_status: 'failed' } : p
       ));
-      return;
+      return false;
     }
 
     const { data: { publicUrl } } = supabase.storage
@@ -299,17 +382,22 @@ export function useCheckinDraft(draftId: string | null) {
       p.id === photoId ? { ...p, photo_url: publicUrl, upload_status: 'saved' } : p
     ));
     pendingFilesRef.current.delete(photoId);
+    return true;
   }, [inspectionId]);
 
-  // Delete a saved photo
+  const replaceFailedPhoto = useCallback(async (photoId: string, file: File): Promise<void> => {
+    await retryPhotoUpload(photoId, file);
+  }, [retryPhotoUpload]);
+
   const deletePhoto = useCallback(async (photoId: string) => {
     setSavedPhotos(prev => prev.filter(p => p.id !== photoId));
+    pendingFilesRef.current.delete(photoId);
     await supabase.from('checkin_photos').delete().eq('id', photoId);
   }, []);
 
-  // Upload walk-around video
   const uploadVideo = useCallback(async (file: File): Promise<void> => {
     if (!inspectionId) return;
+    setVideoUploadStatus('uploading');
     const ext = file.name.split('.').pop() || 'webm';
     const fileName = `${inspectionId}/${Date.now()}.${ext}`;
 
@@ -317,56 +405,63 @@ export function useCheckinDraft(draftId: string | null) {
       .from('checkin-videos')
       .upload(fileName, file, { contentType: file.type });
 
-    if (upErr) return;
+    if (upErr) {
+      setVideoUploadStatus('failed');
+      return;
+    }
 
     const { data: { publicUrl } } = supabase.storage
       .from('checkin-videos')
       .getPublicUrl(fileName);
 
-    await supabase.from('inspections')
+    const { error: dbErr } = await supabase.from('inspections')
       .update({ checkin_video_url: publicUrl })
       .eq('id', inspectionId);
 
+    if (dbErr) {
+      setVideoUploadStatus('failed');
+      return;
+    }
+
     setSavedVideoUrl(publicUrl);
+    setVideoUploadStatus('saved');
   }, [inspectionId]);
 
-  // Delete saved video
   const deleteVideo = useCallback(async () => {
     if (!inspectionId || !savedVideoUrl) return;
     await supabase.from('inspections')
       .update({ checkin_video_url: null })
       .eq('id', inspectionId);
     setSavedVideoUrl(null);
+    setVideoUploadStatus('idle');
   }, [inspectionId, savedVideoUrl]);
 
-  // Flush any pending save immediately (call before completing check-in)
-  const flushSave = useCallback(async (createdBy: string): Promise<string | null> => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-    setSaveStatus('saving');
-    const id = await persist(draftData, inspectionId, createdBy);
-    if (id) {
-      setInspectionId(id);
-      lastSavedRef.current = JSON.stringify(draftData);
-      setSaveStatus('saved');
-    } else {
-      setSaveStatus('error');
-    }
-    return id;
-  }, [draftData, inspectionId, persist]);
-
-  // Force-save current step
   const saveStep = useCallback((step: 1 | 2, createdBy: string) => {
     setDraftData(prev => {
       const next = { ...prev, checkin_step: step };
+      draftDataRef.current = next;
       scheduleSave(next, createdBy);
       return next;
     });
   }, [scheduleSave]);
 
-  const hasMediaErrors = savedPhotos.some(p => p.upload_status === 'failed');
+  const discardDraft = useCallback(async (): Promise<boolean> => {
+    if (!inspectionId) return true;
+    const { error } = await supabase.from('inspections').delete().eq('id', inspectionId);
+    if (error) return false;
+    setInspectionId(null);
+    inspectionIdRef.current = null;
+    setSavedPhotos([]);
+    setSavedVideoUrl(null);
+    setVideoUploadStatus('idle');
+    setDraftData(EMPTY_DRAFT);
+    draftDataRef.current = EMPTY_DRAFT;
+    lastSavedRef.current = '';
+    return true;
+  }, [inspectionId]);
+
+  const hasMediaErrors = savedPhotos.some(p => p.upload_status === 'failed') || videoUploadStatus === 'failed';
+  const hasUploadingMedia = savedPhotos.some(p => p.upload_status === 'uploading') || videoUploadStatus === 'uploading';
 
   return {
     draftData,
@@ -376,16 +471,20 @@ export function useCheckinDraft(draftId: string | null) {
     saveStatus,
     savedPhotos,
     savedVideoUrl,
+    videoUploadStatus,
     hasMediaErrors,
+    hasUploadingMedia,
     updateField,
     updateFields,
     saveStep,
     uploadPhoto,
     retryPhotoUpload,
+    replaceFailedPhoto,
     deletePhoto,
     uploadVideo,
     deleteVideo,
     flushSave,
+    discardDraft,
     setDraftData,
   };
 }

@@ -10,7 +10,7 @@ import { CameraView, VideoRecorderView, SectionHelp } from '../components/common
 import {
   ArrowLeft, Camera, Video, X, Check, ChevronRight, User, Car,
   FileText, Users, AlertCircle, Palette, CheckCircle, ClipboardList,
-  Cloud, CloudOff, Loader2, RotateCw,
+  Cloud, CloudOff, Loader2, RotateCw, Trash2,
 } from 'lucide-react';
 import { withTimeout } from '../lib/async';
 
@@ -53,6 +53,8 @@ export function CheckInPage() {
   const [customModel, setCustomModel] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showVideoRecorder, setShowVideoRecorder] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [retakePhotoId, setRetakePhotoId] = useState<string | null>(null);
 
   const profileId = profile?.id || '';
 
@@ -113,7 +115,12 @@ export function CheckInPage() {
   }
 
   function handlePhotoCapture(file: File) {
-    draft.uploadPhoto(file);
+    if (retakePhotoId) {
+      draft.replaceFailedPhoto(retakePhotoId, file);
+      setRetakePhotoId(null);
+    } else {
+      draft.uploadPhoto(file);
+    }
     setShowCamera(false);
   }
 
@@ -138,6 +145,13 @@ export function CheckInPage() {
     draft.saveStep(newStep, profileId);
   }
 
+  async function handleDiscard() {
+    setShowDiscardConfirm(false);
+    const ok = await draft.discardDraft();
+    if (ok) navigate('/dashboard');
+    else setError('Could not discard draft. Please try again.');
+  }
+
   const photosRequired = checkinConfig.photosMode === 'required';
   const videoRequired = checkinConfig.videoMode === 'required';
   const notesRequired = checkinConfig.notesMode === 'required';
@@ -150,9 +164,9 @@ export function CheckInPage() {
   const failedPhotoCount = draft.savedPhotos.filter(p => p.upload_status === 'failed').length;
 
   const photosOk = !photosRequired || savedPhotoCount >= requiredPhotos;
-  const videoOk = !videoRequired || draft.savedVideoUrl !== null;
+  const videoOk = !videoRequired || (draft.savedVideoUrl !== null && draft.videoUploadStatus === 'saved');
   const notesOk = !notesRequired || draft.draftData.checkin_notes.trim().length > 0;
-  const mediaReady = photosOk && videoOk && draft.hasMediaErrors === false && uploadingPhotoCount === 0;
+  const mediaReady = photosOk && videoOk && !draft.hasMediaErrors && !draft.hasUploadingMedia;
   const canSubmit = mediaReady && notesOk && !submitting;
 
   const step1Valid = !!(
@@ -171,6 +185,8 @@ export function CheckInPage() {
   const years = Array.from({ length: currentYear - 1929 }, (_, i) => currentYear - i);
   const makeOptions = getMakesForYear(draft.draftData.vehicle_year);
   const modelOptions = getModelsForMakeYear(draft.draftData.vehicle_make, draft.draftData.vehicle_year);
+
+  const isResuming = !!draftId;
 
   if (initLoading || draft.draftLoading) return <div className="p-4 text-center text-gray-500">Loading...</div>;
   if (initError) return <div className="p-6 text-center"><p className="text-gray-600 mb-3">Check-in setup could not be loaded.</p><button onClick={loadInit} className="px-4 py-2 rounded-xl bg-primary-600 text-white font-medium">Try Again</button></div>;
@@ -266,6 +282,15 @@ export function CheckInPage() {
             <span className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${step === 2 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}`}>2</span>
           </div>
         </div>
+        {isResuming && (
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-xs text-warning-600 font-medium">Resuming incomplete check-in</span>
+            <button onClick={() => setShowDiscardConfirm(true)}
+              className="text-xs text-danger-500 font-medium flex items-center gap-1 hover:text-danger-600">
+              <Trash2 className="w-3 h-3" /> Discard
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Step 1: Info ─────────────────────────────────────────────────────── */}
@@ -535,9 +560,20 @@ export function CheckInPage() {
                         <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-1">
                           <CloudOff className="w-6 h-6 text-danger-400" />
                           <span className="text-xs text-danger-600 text-center font-medium">Upload failed</span>
-                          <button onClick={() => draft.retryPhotoUpload(p.id)}
-                            className="text-xs text-primary-600 font-medium flex items-center gap-1">
-                            <RotateCw className="w-3 h-3" /> Retry
+                          {p.has_local_file ? (
+                            <button onClick={() => draft.retryPhotoUpload(p.id)}
+                              className="text-xs text-primary-600 font-medium flex items-center gap-1">
+                              <RotateCw className="w-3 h-3" /> Retry
+                            </button>
+                          ) : (
+                            <button onClick={() => { setRetakePhotoId(p.id); setShowCamera(true); }}
+                              className="text-xs text-primary-600 font-medium flex items-center gap-1">
+                              <Camera className="w-3 h-3" /> Re-take
+                            </button>
+                          )}
+                          <button onClick={() => draft.deletePhoto(p.id)}
+                            className="text-xs text-danger-400 font-medium flex items-center gap-1">
+                            <Trash2 className="w-3 h-3" /> Remove
                           </button>
                         </div>
                       ) : (
@@ -564,14 +600,19 @@ export function CheckInPage() {
               {failedPhotoCount > 0 && (
                 <div className="flex items-start gap-2 p-2 bg-danger-50 border border-danger-200 rounded-lg mb-2">
                   <AlertCircle className="w-4 h-4 text-danger-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-danger-700">{failedPhotoCount} photo{failedPhotoCount > 1 ? 's' : ''} failed to upload. Tap Retry on each failed photo to try again.</p>
+                  <p className="text-xs text-danger-700">
+                    {failedPhotoCount} photo{failedPhotoCount > 1 ? 's' : ''} failed to upload.
+                    {draft.savedPhotos.some(p => p.upload_status === 'failed' && !p.has_local_file)
+                      ? ' After a page reload, original files are gone — tap Re-take to capture a new photo, or Remove to discard.'
+                      : ' Tap Retry to try again.'}
+                  </p>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-2 mt-3">
                 <button
                   type="button"
-                  onClick={() => setShowCamera(true)}
+                  onClick={() => { setRetakePhotoId(null); setShowCamera(true); }}
                   className="flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 justify-center hover:bg-gray-50">
                   <Camera className="w-4 h-4" /> Use Camera
                 </button>
@@ -597,14 +638,41 @@ export function CheckInPage() {
                   <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Walk-Around Video</h3>
                 </div>
                 <span className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${
-                  draft.savedVideoUrl ? 'bg-success-100 text-success-700' : videoRequired ? 'bg-warning-100 text-warning-700' : 'bg-gray-100 text-gray-500'
+                  draft.videoUploadStatus === 'saved' ? 'bg-success-100 text-success-700'
+                  : draft.videoUploadStatus === 'uploading' ? 'bg-primary-100 text-primary-700'
+                  : draft.videoUploadStatus === 'failed' ? 'bg-danger-100 text-danger-700'
+                  : videoRequired ? 'bg-warning-100 text-warning-700' : 'bg-gray-100 text-gray-500'
                 }`}>
-                  {draft.savedVideoUrl ? 'Saved' : videoRequired ? 'Required' : 'Optional'}
+                  {draft.videoUploadStatus === 'saved' ? 'Saved'
+                    : draft.videoUploadStatus === 'uploading' ? 'Uploading...'
+                    : draft.videoUploadStatus === 'failed' ? 'Failed'
+                    : videoRequired ? 'Required' : 'Optional'}
                 </span>
               </div>
               <SectionHelp text="Record a full walk-around to capture any pre-existing dents, scratches, or damage on all sides." />
 
-              {draft.savedVideoUrl && (
+              {draft.videoUploadStatus === 'uploading' && (
+                <div className="mt-3 mb-3 flex items-center gap-2 p-3 bg-primary-50 border border-primary-200 rounded-xl">
+                  <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
+                  <span className="text-sm font-medium text-primary-700">Uploading video...</span>
+                </div>
+              )}
+
+              {draft.videoUploadStatus === 'failed' && (
+                <div className="mt-3 mb-3 p-3 bg-danger-50 border border-danger-200 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CloudOff className="w-5 h-5 text-danger-500" />
+                    <span className="text-sm font-medium text-danger-700">Video upload failed</span>
+                  </div>
+                  <p className="text-xs text-danger-600 mb-2">The video file is no longer available after a page reload. Record a new video.</p>
+                  <button onClick={() => setShowVideoRecorder(true)}
+                    className="text-xs text-primary-600 font-medium flex items-center gap-1">
+                    <Video className="w-3 h-3" /> Record Again
+                  </button>
+                </div>
+              )}
+
+              {draft.videoUploadStatus === 'saved' && draft.savedVideoUrl && (
                 <div className="mt-3 mb-3 p-3 bg-success-50 border border-success-200 rounded-xl flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-success-100 flex items-center justify-center flex-shrink-0">
                     <Check className="w-4 h-4 text-success-600" />
@@ -619,19 +687,21 @@ export function CheckInPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2 mt-3">
-                <button type="button" onClick={() => setShowVideoRecorder(true)}
-                  className="flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 justify-center hover:bg-gray-50">
-                  <Video className="w-4 h-4" /> {draft.savedVideoUrl ? 'Re-record' : 'Record Video'}
-                </button>
-                <label className={`flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border justify-center cursor-pointer ${
-                  !draft.savedVideoUrl && videoRequired ? 'border-primary-400 text-primary-600 bg-primary-50 hover:bg-primary-100' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                }`}>
-                  <FileText className="w-4 h-4" /> Upload Video
-                  <input type="file" accept="video/*" className="sr-only"
-                    onChange={e => { handleVideoUpload(e.target.files?.[0]); e.target.value = ''; }} />
-                </label>
-              </div>
+              {draft.videoUploadStatus !== 'saved' && draft.videoUploadStatus !== 'uploading' && (
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <button type="button" onClick={() => setShowVideoRecorder(true)}
+                    className="flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 justify-center hover:bg-gray-50">
+                    <Video className="w-4 h-4" /> Record Video
+                  </button>
+                  <label className={`flex items-center gap-2 text-sm font-medium px-3 py-2.5 rounded-xl border justify-center cursor-pointer ${
+                    !draft.savedVideoUrl && videoRequired ? 'border-primary-400 text-primary-600 bg-primary-50 hover:bg-primary-100' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}>
+                    <FileText className="w-4 h-4" /> Upload Video
+                    <input type="file" accept="video/*" className="sr-only"
+                      onChange={e => { handleVideoUpload(e.target.files?.[0]); e.target.value = ''; }} />
+                  </label>
+                </div>
+              )}
             </section>
           )}
 
@@ -674,7 +744,7 @@ export function CheckInPage() {
           {draft.hasMediaErrors && (
             <div className="flex items-start gap-2 p-3 bg-danger-50 border border-danger-200 rounded-xl">
               <AlertCircle className="w-4 h-4 text-danger-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-danger-700">Some photos failed to upload. Cannot complete check-in until all uploads succeed. Retry the failed uploads above.</p>
+              <p className="text-xs text-danger-700">Some media failed to upload. Cannot complete check-in until all uploads succeed. Fix the failed items above.</p>
             </div>
           )}
 
@@ -690,7 +760,6 @@ export function CheckInPage() {
       {/* Bottom action bar */}
       {step === 2 && (
         <div className="fixed bottom-0 left-0 right-0 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
-          {/* Summary strip */}
           <div className="bg-gray-50 border-t border-gray-200 px-4 py-2 flex items-center gap-3 text-xs text-gray-500">
             <span className={`flex items-center gap-1 font-medium ${photosOk ? 'text-success-600' : 'text-warning-600'}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${photosOk ? 'bg-success-500' : 'bg-warning-400'}`} />
@@ -698,7 +767,7 @@ export function CheckInPage() {
             </span>
             <span className={`flex items-center gap-1 font-medium ${videoOk ? 'text-success-600' : 'text-warning-600'}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${videoOk ? 'bg-success-500' : 'bg-warning-400'}`} />
-              {draft.savedVideoUrl ? 'Video saved' : 'No video'}
+              {draft.videoUploadStatus === 'uploading' ? 'Uploading' : draft.savedVideoUrl ? 'Video saved' : 'No video'}
             </span>
             <span className="flex items-center gap-1 font-medium text-gray-500 ml-auto">
               {d.assigned_tech_id ? `Assigned: ${staff.find(s => s.id === d.assigned_tech_id)?.full_name?.split(' ')[0] ?? 'Me'}` : 'Unassigned'}
@@ -720,7 +789,7 @@ export function CheckInPage() {
             {!canSubmit && !submitting && (
               <p className="text-xs text-center text-gray-400 mt-1.5">
                 {draft.hasMediaErrors ? 'Fix failed uploads to continue' :
-                 uploadingPhotoCount > 0 ? 'Waiting for uploads to finish...' :
+                 draft.hasUploadingMedia ? 'Waiting for uploads to finish...' :
                  !photosOk ? `Add ${requiredPhotos - savedPhotoCount} more photo${requiredPhotos - savedPhotoCount > 1 ? 's' : ''} to continue` :
                  !videoOk ? 'Record the walk-around video to continue' :
                  'Complete all required items above to continue'}
@@ -730,13 +799,29 @@ export function CheckInPage() {
         </div>
       )}
 
+      {/* Discard confirmation */}
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-4" onClick={() => setShowDiscardConfirm(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Discard this check-in?</h2>
+            <p className="text-sm text-gray-600 mb-4">All entered information and photos will be permanently deleted. This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDiscardConfirm(false)}
+                className="flex-1 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl">Cancel</button>
+              <button onClick={handleDiscard}
+                className="flex-1 py-3 bg-danger-600 hover:bg-danger-700 text-white font-semibold rounded-xl">Discard</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Camera overlay */}
       {showCamera && (
         <div className="fixed inset-x-0 top-0 h-[100dvh] bg-black z-50 flex flex-col">
           <div className="flex justify-between items-center p-4 text-white">
-            <button onClick={() => setShowCamera(false)}><X className="w-6 h-6" /></button>
+            <button onClick={() => { setShowCamera(false); setRetakePhotoId(null); }}><X className="w-6 h-6" /></button>
             <span className="font-medium">
-              Photo {draft.savedPhotos.length + 1}{photosRequired ? ` of ${requiredPhotos} min` : ''}
+              {retakePhotoId ? 'Re-take Photo' : `Photo ${draft.savedPhotos.length + 1}${photosRequired ? ` of ${requiredPhotos} min` : ''}`}
             </span>
             <div className="w-10" />
           </div>
@@ -760,23 +845,11 @@ export function CheckInPage() {
     setError(null);
     setSubmitting(true);
 
-    // Flush any pending autosave
+    // 1. Flush any pending autosave first
     await draft.flushSave(profileId);
-
     const id = draft.inspectionId;
 
-    // Mark check-in as complete
-    const { error: completeErr } = await supabase.from('inspections')
-      .update({ checkin_complete: true })
-      .eq('id', id);
-
-    if (completeErr) {
-      setError('Failed to complete check-in. Please try again.');
-      setSubmitting(false);
-      return;
-    }
-
-    // Create inspection sections + items from the template
+    // 2. Create inspection sections + items BEFORE marking complete
     const { data: tSections, error: tSecErr } = await supabase.from('template_sections')
       .select('id, section_name, sort_order')
       .eq('template_id', draft.draftData.template_id)
@@ -822,9 +895,20 @@ export function CheckInPage() {
       }
     }
 
+    // 3. Mark checkin_complete LAST — only after all structural data is confirmed
+    const { error: completeErr } = await supabase.from('inspections')
+      .update({ checkin_complete: true })
+      .eq('id', id);
+
+    if (completeErr) {
+      setError('Sections created, but could not mark check-in as complete. Try again.');
+      setSubmitting(false);
+      return;
+    }
+
     const warnings: string[] = [];
 
-    // Notify tech if assigned
+    // 4. Notify tech if assigned (non-fatal warning)
     if (draft.draftData.assigned_tech_id) {
       const tech = staff.find(s => s.id === draft.draftData.assigned_tech_id);
       if (tech?.role === 'tech') {
