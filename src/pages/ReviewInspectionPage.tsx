@@ -132,6 +132,10 @@ export function ReviewInspectionPage() {
 
   function validateReport() {
     if (!inspection || !overall) return false;
+    if (inspection.correction_requested_at) {
+      setFeedback({ type: 'error', message: 'Acknowledge or dismiss the correction request before approving.' });
+      return false;
+    }
     const attentionItems = items.filter(item => item.status === 'needs_attention');
     const missingPriority = attentionItems.find(item => !priorities[item.id]);
     if (!executiveSummary.trim()) {

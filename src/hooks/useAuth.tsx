@@ -16,6 +16,7 @@ interface AuthContextType {
   isTech: boolean;
   isOwner: boolean;
   isPending: boolean;
+  isDeactivated: boolean;
   isPasswordRecovery: boolean;
   clearPasswordRecovery: () => void;
 }
@@ -65,12 +66,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState(false);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [isDeactivated, setIsDeactivated] = useState(false);
   const authGeneration = useRef(0);
 
   const loadProfile = async (userId: string) => {
     const data = await fetchProfileWithRetry(userId);
     setProfile(data);
     setProfileError(!data);
+    if (data?.deactivated_at) {
+      setIsDeactivated(true);
+      await supabase.auth.signOut();
+      return null;
+    }
+    setIsDeactivated(false);
     return data;
   };
 
@@ -121,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           authGeneration.current += 1;
           setProfile(null);
           setProfileError(false);
+          setIsDeactivated(false);
           setLoading(false);
         }
       }
@@ -180,8 +189,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearPasswordRecovery = () => setIsPasswordRecovery(false);
 
+  // Realtime subscription: watch for deactivation or role changes on our own profile
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`profile-watch-${user.id}`)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'user_profiles', filter: `id=eq.${user.id}` },
+        (payload) => {
+          const updated = payload.new as UserProfile;
+          if (updated.deactivated_at) {
+            setIsDeactivated(true);
+            void supabase.auth.signOut();
+          } else {
+            setProfile(updated);
+            setIsDeactivated(false);
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
+
   return (
-    <AuthContext.Provider value={{ user, profile, session, loading, profileError, signOut, retryProfile, isManager, isTech, isOwner, isPending, isPasswordRecovery, clearPasswordRecovery }}>
+    <AuthContext.Provider value={{ user, profile, session, loading, profileError, signOut, retryProfile, isManager, isTech, isOwner, isPending, isDeactivated, isPasswordRecovery, clearPasswordRecovery }}>
       {children}
     </AuthContext.Provider>
   );

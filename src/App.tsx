@@ -83,8 +83,31 @@ function PendingApprovalScreen() {
   );
 }
 
+function DeactivatedScreen() {
+  const { signOut } = useAuth();
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="max-w-sm w-full">
+        <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-danger-100 mb-4">
+            <LogOut className="w-8 h-8 text-danger-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Account Deactivated</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            Your account has been deactivated by an administrator. Please contact your shop manager if you believe this is an error.
+          </p>
+          <button onClick={signOut}
+            className="flex items-center gap-2 mx-auto text-gray-500 hover:text-gray-800 text-sm font-medium">
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AppRoutes() {
-  const { user, profile, loading, profileError, isManager, isOwner, isPending, isPasswordRecovery, clearPasswordRecovery } = useAuth();
+  const { user, profile, loading, profileError, isManager, isOwner, isPending, isDeactivated, isPasswordRecovery, clearPasswordRecovery } = useAuth();
   const location = useLocation();
   const [showSignup, setShowSignup] = useState(false);
 
@@ -106,6 +129,10 @@ function AppRoutes() {
 
   if (profileError || (!profile && !loading)) {
     return <ProfileErrorScreen />;
+  }
+
+  if (isDeactivated) {
+    return <DeactivatedScreen />;
   }
 
   if (isPending) {
