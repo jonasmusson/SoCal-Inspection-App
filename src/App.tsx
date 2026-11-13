@@ -121,6 +121,7 @@ function AppRoutes() {
         <Route path="/dashboard" element={isManager || isOwner ? <DashboardPage /> : <Navigate to="/my-inspections" replace />} />
         <Route path="/my-inspections" element={<MyInspectionsPage />} />
         <Route path="/checkin" element={isManager || isOwner ? <CheckInPage /> : <Navigate to="/my-inspections" replace />} />
+        <Route path="/checkin/:draftId" element={isManager || isOwner ? <CheckInPage /> : <Navigate to="/my-inspections" replace />} />
         <Route path="/inspection/:id" element={<InspectionDetailPage />} />
         <Route path="/inspect/:id" element={<InspectRedirect />} />
         <Route path="/inspect/:id/:sectionNumber" element={<InspectSectionPage />} />

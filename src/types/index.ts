@@ -23,6 +23,7 @@ export interface CheckinPhoto {
   id: string;
   inspection_id: string;
   photo_url: string;
+  upload_status: 'uploading' | 'saved' | 'failed';
   created_at: string;
 }
 
@@ -74,6 +75,7 @@ export interface Inspection {
   checkin_notes: string | null;
   checkin_video_url: string | null;
   checkin_complete: boolean;
+  checkin_step: number | null;
   work_started_at: string | null;
   work_completed_at: string | null;
   created_at: string;

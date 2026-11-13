@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Inspection } from '../types';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ProgressBar } from '../components/common/ProgressBar';
-import { Plus, Search, Car, AlertCircle, Clock, CheckCircle, Archive, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Car, AlertCircle, Clock, CheckCircle, Archive, AlertTriangle, RotateCw } from 'lucide-react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { withTimeout } from '../lib/async';
@@ -99,10 +99,35 @@ export function DashboardPage() {
       </div>
 
       {!showArchived && (
-        <button onClick={() => navigate('/checkin')}
-          className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 mb-6">
-          <Plus className="w-5 h-5" /> New Check-In
-        </button>
+        <>
+          {inspections.filter(i => !i.checkin_complete).length > 0 && (
+            <div className="mb-6 space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
+                <RotateCw className="w-3 h-3" /> Resume Check-In
+              </p>
+              {inspections.filter(i => !i.checkin_complete).map(i => (
+                <button key={i.id} onClick={() => navigate(`/checkin/${i.id}`)}
+                  className="w-full bg-warning-50 border border-warning-200 rounded-xl p-3 text-left hover:border-warning-300 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 text-sm truncate">
+                      {i.vehicle_make || i.vehicle_model ? `${i.vehicle_year} ${i.vehicle_make} ${i.vehicle_model}` : 'New check-in'}
+                    </h3>
+                    <p className="text-xs text-gray-500 truncate">
+                      {i.customer_first_name || i.customer_last_name ? `${i.customer_first_name} ${i.customer_last_name}` : 'No customer yet'} · {format(new Date(i.created_at), 'MMM d, h:mm a')}
+                    </p>
+                  </div>
+                  <span className="flex-shrink-0 px-3 py-1.5 bg-warning-500 text-white text-xs font-semibold rounded-lg">
+                    Resume
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={() => navigate('/checkin')}
+            className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 mb-6">
+            <Plus className="w-5 h-5" /> New Check-In
+          </button>
+        </>
       )}
 
       {showArchived && (
@@ -131,8 +156,8 @@ export function DashboardPage() {
         ) : (
           <div className="space-y-3">
             {inspections.map(i => (
-              <button key={i.id} onClick={() => navigate(i.status === 'pending_review' ? `/review/${i.id}` : `/inspection/${i.id}`)}
-                className="w-full bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-left hover:border-primary-300">
+              <button key={i.id} onClick={() => navigate(i.checkin_complete === false ? `/checkin/${i.id}` : i.status === 'pending_review' ? `/review/${i.id}` : `/inspection/${i.id}`)}
+                className={`w-full bg-white rounded-xl p-4 shadow-sm border text-left hover:border-primary-300 ${i.checkin_complete === false ? 'border-warning-200 bg-warning-50/30' : 'border-gray-200'}`}>
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="font-semibold text-gray-900">{i.vehicle_year} {i.vehicle_make} {i.vehicle_model}</h3>
