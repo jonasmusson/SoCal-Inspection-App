@@ -100,12 +100,15 @@ input[type=number] {
   }
 
   .printable-report [data-report-cover] {
-    min-height: 10.4in !important;
     break-after: page;
     page-break-after: always;
   }
 
-  .printable-report [data-report-system],
+  .printable-report [data-report-system] {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
   .printable-report [data-report-finding] {
     break-inside: avoid;
     page-break-inside: avoid;
