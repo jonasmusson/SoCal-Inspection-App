@@ -268,8 +268,15 @@ export function InspectSectionPage() {
         <ProgressBar percent={inspection.progress_percent} />
       </div>
 
-      <div className="p-4 space-y-4">
-        <div className="flex items-center justify-between text-xs font-semibold text-gray-500 uppercase tracking-wider"><span>Finding {Math.min(currentItemIndex + 1, items.length)} of {items.length}</span><span>{Math.round(((currentItemIndex + 1) / Math.max(items.length, 1)) * 100)}% of section</span></div>
+      <div className="p-4 space-y-3">
+        <div className="flex items-center justify-between text-xs font-semibold text-gray-500">
+          <span>Item {Math.min(currentItemIndex + 1, items.length)} of {items.length}</span>
+          <div className="flex items-center gap-1">
+            {items.map((_, i) => (
+              <span key={i} className={`h-1.5 rounded-full transition-all ${i === currentItemIndex ? 'w-4 bg-primary-500' : i < currentItemIndex ? 'w-1.5 bg-success-400' : 'w-1.5 bg-gray-300'}`} />
+            ))}
+          </div>
+        </div>
         {items.slice(currentItemIndex, currentItemIndex + 1).map(item => {
           const showNotes = item.notes_mode === 'required' || (item.notes_mode === 'optional' && (item.status === 'needs_attention' || item.status === 'monitor'));
           const showPhoto = item.photo_mode === 'required' || (item.photo_mode === 'optional' && (item.status === 'needs_attention' || item.status === 'monitor'));
@@ -303,7 +310,7 @@ export function InspectSectionPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {(['good', 'monitor', 'needs_attention', 'not_inspected'] as InspectionItemStatus[]).map(c => (
                   <ConditionButton key={c} condition={c} selected={item.status === c} onClick={() => handleCondition(item, c)} />
                 ))}
@@ -320,10 +327,10 @@ export function InspectSectionPage() {
                   rows={2}
                 />
               )}
-              {(item.status === 'needs_attention' || item.status === 'monitor') && <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3"><p className="text-xs font-bold uppercase tracking-wider text-gray-500">Report-ready finding</p>
-                <label className="block text-xs font-semibold text-gray-600">Why it matters<textarea defaultValue={item.impact || ''} onBlur={e=>updateItem(item.id,{impact:e.target.value || null})} placeholder="Safety, reliability, drivability or preservation impact..." className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none" rows={2}/></label>
-                <label className="block text-xs font-semibold text-gray-600">Recommended action<textarea defaultValue={item.recommended_action || ''} onBlur={e=>updateItem(item.id,{recommended_action:e.target.value || null})} placeholder="What should be repaired, verified or upgraded next..." className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none" rows={2}/></label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{([['Labor low','labor_hours_low',.5],['Labor high','labor_hours_high',.5],['Parts low','parts_cost_low',25],['Parts high','parts_cost_high',25]] as const).map(([label,key,step])=><label key={key} className="text-xs text-gray-500">{label}<input type="number" min="0" step={step} defaultValue={item[key] ?? ''} onBlur={e=>updateItem(item.id,{[key]:e.target.value?Number(e.target.value):null})} className="mt-1 w-full px-2 py-2 border border-gray-300 rounded-lg text-sm"/></label>)}</div><p className="text-[11px] text-gray-400">Planning ranges only—not a fixed estimate.</p></div>}
+              {(item.status === 'needs_attention' || item.status === 'monitor') && <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3"><p className="text-xs font-bold uppercase tracking-wider text-gray-500">Finding details</p>
+                <label className="block text-xs font-semibold text-gray-600">Why it matters<textarea defaultValue={item.impact || ''} onBlur={e=>updateItem(item.id,{impact:e.target.value || null})} placeholder="Safety, reliability, drivability or preservation impact..." className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none" rows={3}/></label>
+                <label className="block text-xs font-semibold text-gray-600">Recommended action<textarea defaultValue={item.recommended_action || ''} onBlur={e=>updateItem(item.id,{recommended_action:e.target.value || null})} placeholder="What should be repaired, verified or upgraded next..." className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none" rows={3}/></label>
+              </div>}
 
               {(showPhoto || showVideo) && (
                 <div className="mt-3 flex items-center gap-3 flex-wrap">
@@ -387,26 +394,30 @@ export function InspectSectionPage() {
             Rate all {unratedCount} remaining item{unratedCount > 1 ? 's' : ''} to continue
           </p>
         )}
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             onClick={saveAndExit}
-            className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50 transition-colors flex-shrink-0">
+            aria-label="Save and exit"
+            className="flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50 transition-colors flex-shrink-0">
             <Pause className="w-4 h-4" />
-            Save & Exit
           </button>
-          <button onClick={()=>setCurrentItemIndex(i=>Math.max(0,i-1))} disabled={currentItemIndex===0} className="px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-sm disabled:opacity-30">Previous</button>
-          {currentItemIndex < items.length - 1 && <button onClick={()=>setCurrentItemIndex(i=>Math.min(items.length-1,i+1))} disabled={!currentReady} className="flex-1 py-3 rounded-xl font-medium bg-[#3d463a] text-white disabled:bg-gray-200 disabled:text-gray-400 flex items-center justify-center gap-2">Save & Next Item <ArrowRight className="w-4 h-4"/></button>}
+          <button onClick={()=>setCurrentItemIndex(i=>Math.max(0,i-1))} disabled={currentItemIndex===0} aria-label="Previous item" className="px-3 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-sm disabled:opacity-30 flex-shrink-0">
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          {currentItemIndex < items.length - 1 && <button onClick={()=>setCurrentItemIndex(i=>Math.min(items.length-1,i+1))} disabled={!currentReady} className="flex-1 py-3 rounded-xl font-medium bg-[#3d463a] text-white disabled:bg-gray-200 disabled:text-gray-400 flex items-center justify-center gap-2 min-w-0">
+            <span className="truncate">Next Item</span> <ArrowRight className="w-4 h-4 flex-shrink-0"/>
+          </button>}
           {currentItemIndex === items.length - 1 && <button
             onClick={completeSection}
             disabled={!canComplete || loading}
-            className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-200 ${
+            className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-200 min-w-0 ${
               canComplete
                 ? 'bg-primary-600 hover:bg-primary-700 text-white shadow-sm'
                 : 'bg-white border-2 border-gray-200 text-gray-300 cursor-not-allowed'
             }`}>
-            <Check className="w-5 h-5" />
-            {sectionNum === totalSections ? 'Complete & Submit' : 'Next Section'}
-            <ArrowRight className="w-5 h-5" />
+            <Check className="w-5 h-5 flex-shrink-0" />
+            <span className="truncate">{sectionNum === totalSections ? 'Complete & Submit' : 'Next Section'}</span>
+            <ArrowRight className="w-5 h-5 flex-shrink-0" />
           </button>}
         </div>
       </div>
