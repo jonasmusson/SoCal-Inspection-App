@@ -1,18 +1,37 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Mail, Lock, User, Eye, EyeOff, CheckCircle, ArrowLeft, Car } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, CheckCircle, ArrowLeft } from 'lucide-react';
+import { AuthShell } from './AuthShell';
 
 interface LoginPageProps { onSuccess: () => void; onShowSignup: () => void; }
 interface SignupPageProps { onSuccess: () => void; onShowLogin: () => void; }
 
-function Brand() {
+const inputClass = 'w-full rounded-lg border border-primary-200 bg-white px-3.5 py-3 text-sm text-primary-900 placeholder:text-primary-400 transition-colors focus:border-accent-500 focus:ring-2 focus:ring-accent-500/15';
+const iconInputClass = `${inputClass} pl-10`;
+const buttonClass = 'w-full rounded-lg bg-primary-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-50';
+const secondaryButtonClass = 'font-semibold text-accent-700 transition-colors hover:text-accent-900 hover:underline';
+
+function FieldLabel({ children, htmlFor }: { children: React.ReactNode; htmlFor: string }) {
+  return <label htmlFor={htmlFor} className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-primary-600">{children}</label>;
+}
+
+function PasswordInput({ id, value, onChange, placeholder, show, onToggle, required = true, minLength }: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  show: boolean;
+  onToggle: () => void;
+  required?: boolean;
+  minLength?: number;
+}) {
   return (
-    <div className="text-center mb-8">
-      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent-500 mb-4 shadow-elevated">
-        <Car className="w-7 h-7 text-primary-900" />
-      </div>
-      <h1 className="font-display text-3xl tracking-wide text-primary-900">SoCAL AUTOWORKS</h1>
-      <p className="text-xs text-gray-500 mt-1 uppercase tracking-[0.2em]">Inspection Management System</p>
+    <div className="relative">
+      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary-400" />
+      <input id={id} type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)} className={`${iconInputClass} pr-10`} placeholder={placeholder} required={required} minLength={minLength} />
+      <button type="button" onClick={onToggle} aria-label={show ? 'Hide password' : 'Show password'} className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-400 transition-colors hover:text-primary-800">
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
     </div>
   );
 }
@@ -33,9 +52,7 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
     setError(null);
     try {
       const signIn = supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-      const timeout = new Promise<never>((_, reject) =>
-        window.setTimeout(() => reject(new Error('AUTH_TIMEOUT')), 12000)
-      );
+      const timeout = new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error('AUTH_TIMEOUT')), 12000));
       const { error } = await Promise.race([signIn, timeout]);
       if (error) setError(error.message);
       else onSuccess();
@@ -52,125 +69,44 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
     e.preventDefault();
     setLoading(true);
     setForgotError(null);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
     setLoading(false);
-    if (error) {
-      setForgotError(error.message);
-    } else {
-      setForgotSent(true);
-    }
+    if (error) setForgotError(error.message);
+    else setForgotSent(true);
   };
 
   if (forgotMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-        <div className="max-w-md w-full animate-slide-up">
-          <Brand />
-          <div className="bg-white rounded-2xl shadow-elevated p-8">
-            {forgotSent ? (
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-success-100 mb-4">
-                  <CheckCircle className="w-7 h-7 text-success-600" />
-                </div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-3">Check your email</h2>
-                <p className="text-gray-600 mb-6">
-                  We've sent a password reset link to <strong className="text-gray-800">{email}</strong>.
-                  Click the link in the email to set a new password.
-                </p>
-                <button onClick={() => { setForgotMode(false); setForgotSent(false); setEmail(''); }}
-                  className="text-accent-600 font-medium hover:underline text-sm">
-                  Back to Sign In
-                </button>
-              </div>
-            ) : (
-              <>
-                <button onClick={() => setForgotMode(false)}
-                  className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm mb-4 transition-colors">
-                  <ArrowLeft className="w-4 h-4" /> Back to Sign In
-                </button>
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">Reset Password</h2>
-                <p className="text-gray-500 text-sm mb-6">
-                  Enter your email and we'll send you a link to reset your password.
-                </p>
-                <form onSubmit={handleForgotPassword} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none transition-all"
-                        placeholder="your@email.com" required />
-                    </div>
-                  </div>
-                  {forgotError && <div className="p-3 bg-danger-50 text-danger-700 rounded-lg text-sm">{forgotError}</div>}
-                  <button type="submit" disabled={loading}
-                    className="w-full py-3 px-4 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl disabled:opacity-50 transition-colors">
-                    {loading ? 'Sending...' : 'Send Reset Link'}
-                  </button>
-                </form>
-              </>
-            )}
+      <AuthShell eyebrow="Account recovery" title={forgotSent ? 'Check your email' : 'Reset your password'} description={forgotSent ? `We sent a secure reset link to ${email}.` : 'Enter the email used for your SoCal Autoworks account and we’ll send a secure reset link.'}>
+        {forgotSent ? (
+          <div className="text-center">
+            <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-success-50 text-success-700"><CheckCircle className="h-6 w-6" /></div>
+            <p className="text-sm leading-6 text-primary-500">Open the link in your email to choose a new password.</p>
+            <button onClick={() => { setForgotMode(false); setForgotSent(false); setEmail(''); }} className={`mt-6 text-sm ${secondaryButtonClass}`}>Back to sign in</button>
           </div>
-        </div>
-      </div>
+        ) : (
+          <>
+            <button onClick={() => setForgotMode(false)} className="mb-6 flex items-center gap-2 text-sm font-medium text-primary-500 transition-colors hover:text-primary-900"><ArrowLeft className="h-4 w-4" /> Back to sign in</button>
+            <form onSubmit={handleForgotPassword} className="space-y-5">
+              <div><FieldLabel htmlFor="forgot-email">Email address</FieldLabel><div className="relative"><Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary-400" /><input id="forgot-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={iconInputClass} placeholder="name@company.com" required /></div></div>
+              {forgotError && <div role="alert" className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2.5 text-sm text-danger-700">{forgotError}</div>}
+              <button type="submit" disabled={loading} className={buttonClass}>{loading ? 'Sending link…' : 'Send reset link'}</button>
+            </form>
+          </>
+        )}
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="max-w-md w-full animate-slide-up">
-        <Brand />
-        <div className="bg-white rounded-2xl shadow-elevated p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-1">Sign In</h2>
-          <p className="text-sm text-gray-500 mb-6">Enter your credentials to access the inspection system</p>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none transition-all"
-                  placeholder="your@email.com" required />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium text-gray-700">Password</label>
-                <button type="button" onClick={() => { setForgotMode(true); setError(null); }}
-                  className="text-xs text-accent-600 font-medium hover:underline">
-                  Forgot password?
-                </button>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none transition-all"
-                  placeholder="Enter password" required />
-                <button type="button" onClick={() => setShowPass(p => !p)}
-                  aria-label={showPass ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                  {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-            {error && (
-              <div className="p-3 bg-danger-50 text-danger-700 rounded-lg text-sm animate-fade-in">{error}</div>
-            )}
-            <button type="submit" disabled={loading}
-              className="w-full py-3 px-4 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl disabled:opacity-50 transition-colors active:scale-[0.98]">
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
-          <div className="mt-6 text-center border-t border-gray-100 pt-6">
-            <p className="text-gray-600 text-sm">Don't have an account?{' '}
-              <button onClick={onShowSignup} className="text-accent-600 font-semibold hover:underline">Request Access</button>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AuthShell eyebrow="Authorized staff access" title="Sign in to your workspace" description="Manage inspections, findings, and customer reports from one precise workspace." footer={<p className="text-sm text-primary-500">Need access? <button onClick={onShowSignup} className={secondaryButtonClass}>Request access</button></p>}>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div><FieldLabel htmlFor="login-email">Email address</FieldLabel><div className="relative"><Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary-400" /><input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={iconInputClass} placeholder="name@company.com" autoComplete="email" required /></div></div>
+        <div><div className="mb-2 flex items-center justify-between"><FieldLabel htmlFor="login-password">Password</FieldLabel><button type="button" onClick={() => { setForgotMode(true); setError(null); }} className="text-xs font-semibold text-accent-700 hover:text-accent-900">Forgot password?</button></div><PasswordInput id="login-password" value={password} onChange={setPassword} placeholder="Enter your password" show={showPass} onToggle={() => setShowPass((value) => !value)} /></div>
+        {error && <div role="alert" className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2.5 text-sm leading-5 text-danger-700">{error}</div>}
+        <button type="submit" disabled={loading} className={buttonClass}>{loading ? 'Signing in…' : 'Sign in'}</button>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -190,146 +126,33 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
-    if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
-      setError('Choose at least 12 characters with an uppercase letter, lowercase letter, number, and symbol. Avoid common words or reused passwords.');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-
+    if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) { setError('Choose at least 12 characters with an uppercase letter, lowercase letter, number, and symbol. Avoid common words or reused passwords.'); return; }
+    setLoading(true); setError(null);
+    const normalizedEmail = email.trim().toLowerCase();
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: { data: { full_name: fullName, first_name: firstName.trim(), last_name: lastName.trim() } },
-    });
+    const { data, error: signUpError } = await supabase.auth.signUp({ email: normalizedEmail, password, options: { data: { full_name: fullName, first_name: firstName.trim(), last_name: lastName.trim() } } });
     if (signUpError) { setError(signUpError.message); setLoading(false); return; }
-    if (data.user) {
-      if (email.trim().toLowerCase() !== OWNER_EMAIL) {
-        supabase.functions.invoke('send-signup-confirmation', { body: { userId: data.user.id } });
-      }
-      setSubmitted(true);
-    }
+    if (data.user) { if (normalizedEmail !== OWNER_EMAIL) supabase.functions.invoke('send-signup-confirmation', { body: { userId: data.user.id } }); setSubmitted(true); }
   };
 
+  const passwordsMatch = confirmPassword === '' || password === confirmPassword;
+  const normalizedEmail = email.trim().toLowerCase();
+
   if (submitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-        <div className="max-w-md w-full text-center animate-slide-up">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-success-100 mb-4">
-            <CheckCircle className="w-7 h-7 text-success-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">{email.trim().toLowerCase() === OWNER_EMAIL ? 'Owner account created' : 'Access request submitted'}</h2>
-          {email.trim().toLowerCase() === OWNER_EMAIL ? (
-            <p className="text-gray-500 text-sm">Your Owner account is activated automatically. You can sign in now with <strong className="text-gray-700">{email}</strong>.</p>
-          ) : (
-            <>
-              <p className="text-gray-600 mb-2">Your account is pending approval.</p>
-              <p className="text-gray-500 text-sm">A manager or owner will review your request. You'll receive a welcome email at <strong className="text-gray-700">{email}</strong> once approved.</p>
-            </>
-          )}
-          <button onClick={onShowLogin} className="mt-8 text-accent-600 font-semibold hover:underline text-sm">{email.trim().toLowerCase() === OWNER_EMAIL ? 'Continue to Sign In' : 'Back to Sign In'}</button>
-        </div>
-      </div>
-    );
+    const isOwner = normalizedEmail === OWNER_EMAIL;
+    return <AuthShell eyebrow="Access request" title={isOwner ? 'Owner account created' : 'Request submitted'} description={isOwner ? 'Your owner account is ready. You can sign in with the credentials you just created.' : 'Your request is now with the SoCal Autoworks team for review.'} compact><div className="text-center"><div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-success-50 text-success-700"><CheckCircle className="h-6 w-6" /></div><p className="text-sm leading-6 text-primary-500">{isOwner ? `You can sign in now with ${email}.` : `You’ll receive an email at ${email} once your access is approved.`}</p><button onClick={onShowLogin} className={`mt-6 text-sm ${secondaryButtonClass}`}>{isOwner ? 'Continue to sign in' : 'Back to sign in'}</button></div></AuthShell>;
   }
 
-  const passwordsMatch = confirmPassword === '' || password === confirmPassword;
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-8">
-      <div className="max-w-md w-full animate-slide-up">
-        <Brand />
-        <div className="bg-white rounded-2xl shadow-elevated p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-1">Create Account</h2>
-          <p className="text-sm text-gray-500 mb-6">Request access to the inspection system</p>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">First Name</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none text-sm transition-all"
-                    placeholder="John" required />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Last Name</label>
-                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none text-sm transition-all"
-                  placeholder="Smith" required />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none transition-all"
-                  placeholder="your@email.com" required />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none transition-all"
-                  placeholder="Create a secure password" required minLength={12} />
-                <button type="button" onClick={() => setShowPass(p => !p)}
-                  aria-label={showPass ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                  {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-gray-500 leading-relaxed">
-                Use 12+ characters with uppercase and lowercase letters, a number, and a symbol. Avoid common words and passwords used on other sites.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showConfirm ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`w-full pl-10 pr-10 py-3 border rounded-xl focus:ring-2 focus:ring-accent-400 outline-none transition-all ${!passwordsMatch ? 'border-danger-400 bg-danger-50' : 'border-gray-300'}`}
-                  placeholder="Re-enter password" required />
-                <button type="button" onClick={() => setShowConfirm(p => !p)}
-                  aria-label={showConfirm ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                  {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {!passwordsMatch && (
-                <p className="mt-1 text-xs text-danger-600">Passwords do not match</p>
-              )}
-            </div>
-
-            <div className="p-3 bg-accent-50 rounded-xl border border-accent-100">
-              <p className="text-xs text-accent-800 leading-relaxed">
-                The designated Owner account is activated automatically. All other accounts require approval from an Owner or Manager.
-              </p>
-            </div>
-
-            {error && <div className="p-3 bg-danger-50 text-danger-700 rounded-lg text-sm animate-fade-in">{error}</div>}
-            <button type="submit" disabled={loading || !passwordsMatch}
-              className="w-full py-3 px-4 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl disabled:opacity-50 transition-colors active:scale-[0.98]">
-              {loading ? 'Submitting...' : 'Submit Request'}
-            </button>
-          </form>
-          <div className="mt-6 text-center border-t border-gray-100 pt-6">
-            <p className="text-gray-600 text-sm">Already have an account?{' '}
-              <button onClick={onShowLogin} className="text-accent-600 font-semibold hover:underline">Sign In</button>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AuthShell eyebrow="New staff member" title="Request access" description="Create your account details. A manager or owner will review your request before you can enter the workspace." compact footer={<p className="text-sm text-primary-500">Already have access? <button onClick={onShowLogin} className={secondaryButtonClass}>Sign in</button></p>}>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="grid grid-cols-2 gap-3"><div><FieldLabel htmlFor="first-name">First name</FieldLabel><div className="relative"><User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary-400" /><input id="first-name" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={iconInputClass} placeholder="First" required /></div></div><div><FieldLabel htmlFor="last-name">Last name</FieldLabel><input id="last-name" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputClass} placeholder="Last" required /></div></div>
+        <div><FieldLabel htmlFor="signup-email">Email address</FieldLabel><div className="relative"><Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary-400" /><input id="signup-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={iconInputClass} placeholder="name@company.com" autoComplete="email" required /></div></div>
+        <div><FieldLabel htmlFor="signup-password">Password</FieldLabel><PasswordInput id="signup-password" value={password} onChange={setPassword} placeholder="Create a secure password" show={showPass} onToggle={() => setShowPass((value) => !value)} minLength={12} /><p className="mt-2 text-xs leading-5 text-primary-500">Use 12+ characters with uppercase and lowercase letters, a number, and a symbol.</p></div>
+        <div><FieldLabel htmlFor="confirm-password">Confirm password</FieldLabel><PasswordInput id="confirm-password" value={confirmPassword} onChange={setConfirmPassword} placeholder="Re-enter your password" show={showConfirm} onToggle={() => setShowConfirm((value) => !value)} /><p className={`mt-2 text-xs ${!passwordsMatch ? 'text-danger-700' : 'text-primary-500'}`}>{!passwordsMatch ? 'Passwords do not match.' : 'Your request will be reviewed before access is granted.'}</p></div>
+        {error && <div role="alert" className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2.5 text-sm leading-5 text-danger-700">{error}</div>}
+        <button type="submit" disabled={loading || !passwordsMatch} className={buttonClass}>{loading ? 'Submitting request…' : 'Submit access request'}</button>
+      </form>
+    </AuthShell>
   );
 }

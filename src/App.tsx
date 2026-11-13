@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { LoadingScreen } from './components/LoadingScreen';
 import { LoginPage, SignupPage } from './components/Auth/LoginPage';
 import { ResetPasswordPage } from './components/Auth/ResetPasswordPage';
+import { AuthShell } from './components/Auth/AuthShell';
 import { Layout } from './components/Layout';
 import { DashboardPage } from './pages/DashboardPage';
 import { MyInspectionsPage } from './pages/MyInspectionsPage';
@@ -40,69 +41,30 @@ function InspectRedirect() {
 function ProfileErrorScreen() {
   const { retryProfile, signOut } = useAuth();
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-sm w-full text-center">
-        <p className="text-gray-700 font-medium mb-2">Could not load your profile.</p>
-        <p className="text-gray-500 text-sm mb-6">This is usually a network or permissions issue.</p>
-        <button onClick={retryProfile}
-          className="px-6 py-3 bg-accent-500 text-white rounded-xl font-semibold hover:bg-accent-600 mr-3 transition-colors">
-          Retry
-        </button>
-        <button onClick={signOut}
-          className="px-6 py-3 border border-gray-200 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
-          Sign Out
-        </button>
+    <AuthShell eyebrow="Workspace access" title="Profile unavailable" description="We could not load your staff profile. This is usually a temporary connection or permissions issue." compact>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <button onClick={retryProfile} className="flex-1 rounded-lg bg-primary-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-800">Retry</button>
+        <button onClick={signOut} className="flex-1 rounded-lg border border-primary-200 px-4 py-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50">Sign out</button>
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
 function PendingApprovalScreen() {
   const { signOut, profile } = useAuth();
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-sm w-full">
-        <div className="bg-white rounded-2xl shadow-elevated p-8 text-center animate-slide-up">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-warning-100 mb-4">
-            <Clock className="w-7 h-7 text-warning-600" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Account Pending Approval</h2>
-          <p className="text-gray-500 text-sm mb-2">
-            Hi {profile?.first_name || profile?.full_name?.split(' ')[0]}, your account request is being reviewed.
-          </p>
-          <p className="text-gray-400 text-sm mb-6">
-            You'll receive a welcome email at <strong className="text-gray-600">{profile?.email}</strong> once a manager or owner approves your account.
-          </p>
-          <button onClick={signOut}
-            className="flex items-center gap-2 mx-auto text-gray-500 hover:text-gray-800 text-sm font-medium">
-            <LogOut className="w-4 h-4" /> Sign Out
-          </button>
-        </div>
-      </div>
-    </div>
+    <AuthShell eyebrow="Access request" title="Approval in progress" description={`Hi ${profile?.first_name || profile?.full_name?.split(' ')[0] || 'there'}, your account request is being reviewed.`} compact>
+      <div className="text-center"><div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-warning-50 text-warning-700"><Clock className="h-6 w-6" /></div><p className="text-sm leading-6 text-primary-500">You’ll receive a welcome email at <strong className="font-semibold text-primary-800">{profile?.email}</strong> once a manager or owner approves your account.</p><button onClick={signOut} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary-600 hover:text-primary-950"><LogOut className="h-4 w-4" /> Sign out</button></div>
+    </AuthShell>
   );
 }
 
 function DeactivatedScreen() {
   const { signOut } = useAuth();
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-sm w-full">
-        <div className="bg-white rounded-2xl shadow-elevated p-8 text-center animate-slide-up">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-danger-100 mb-4">
-            <LogOut className="w-7 h-7 text-danger-600" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Account Deactivated</h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Your account has been deactivated by an administrator. Please contact your shop manager if you believe this is an error.
-          </p>
-          <button onClick={signOut}
-            className="flex items-center gap-2 mx-auto text-gray-500 hover:text-gray-800 text-sm font-medium">
-            <LogOut className="w-4 h-4" /> Sign Out
-          </button>
-        </div>
-      </div>
-    </div>
+    <AuthShell eyebrow="Workspace access" title="Account deactivated" description="Your account has been deactivated by an administrator. Contact your shop manager if you believe this is an error." compact>
+      <div className="text-center"><div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-danger-50 text-danger-700"><LogOut className="h-6 w-6" /></div><button onClick={signOut} className="inline-flex items-center gap-2 text-sm font-semibold text-primary-600 hover:text-primary-950"><LogOut className="h-4 w-4" /> Sign out</button></div>
+    </AuthShell>
   );
 }
 
