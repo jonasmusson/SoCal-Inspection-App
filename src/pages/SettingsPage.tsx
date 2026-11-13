@@ -77,11 +77,25 @@ export function SettingsPage() {
     setApprovingId(user.id);
     setDeliveryNotice(null);
     const role = pendingRoles[user.id] ?? 'tech';
-    const { error: updateError } = await supabase.from('user_profiles').update({ status: 'active', role }).eq('id', user.id);
+    // Activate the user (status pending → active) via SECURITY DEFINER function
+    const { error: updateError } = await supabase.rpc('set_user_status', {
+      target_user_id: user.id,
+      new_status: 'active',
+    });
     if (updateError) {
       setDeliveryNotice(`Account approval failed: ${updateError.message}`);
       setApprovingId(null);
       return;
+    }
+    // Set role via SECURITY DEFINER function (enforces last-owner protection at DB level)
+    if (role !== 'tech') {
+      const { error: roleError } = await supabase.rpc('set_user_role', {
+        target_user_id: user.id,
+        new_role: role,
+      });
+      if (roleError) {
+        setDeliveryNotice(`Account activated but role could not be set: ${roleError.message}`);
+      }
     }
     const { data: emailResult, error: emailError } = await supabase.functions.invoke('send-welcome-email', { body: { userId: user.id } });
     if (emailError || emailResult?.emailSent !== true) {
@@ -105,7 +119,11 @@ export function SettingsPage() {
       return;
     }
     setRoleError(null);
-    const { error } = await supabase.from('user_profiles').update({ role }).eq('id', userId);
+    // Role change via SECURITY DEFINER function (enforces authorization + last-owner at DB level)
+    const { error } = await supabase.rpc('set_user_role', {
+      target_user_id: userId,
+      new_role: role,
+    });
     if (error) {
       setRoleError(`Failed to update role: ${error.message}`);
       return;
@@ -115,14 +133,18 @@ export function SettingsPage() {
 
   async function toggleDeactivate(userId: string, currentlyActive: boolean) {
     setDeactivatingId(userId);
-    const now = currentlyActive ? new Date().toISOString() : null;
-    const { error } = await supabase.from('user_profiles')
-      .update({ deactivated_at: now })
-      .eq('id', userId);
+    // Deactivate/reactivate via SECURITY DEFINER function (enforces last-owner + self-protection at DB level)
+    const { error } = await supabase.rpc('set_user_status', {
+      target_user_id: userId,
+      new_status: currentlyActive ? 'pending' : 'active',
+    });
     if (!error) {
+      const now = currentlyActive ? new Date().toISOString() : null;
       setActiveUsers(prev => prev.map(u =>
-        u.id === userId ? { ...u, deactivated_at: now } : u
+        u.id === userId ? { ...u, deactivated_at: now, status: currentlyActive ? 'pending' as const : 'active' as const } : u
       ));
+    } else {
+      setRoleError(`Failed to ${currentlyActive ? 'deactivate' : 'reactivate'} user: ${error.message}`);
     }
     setDeactivatingId(null);
   }

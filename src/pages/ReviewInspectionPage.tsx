@@ -163,16 +163,24 @@ export function ReviewInspectionPage() {
     );
     const priorityResults = await Promise.all(updates);
 
-    const { error: approvalError } = await supabase.from('inspections').update({
-      status: 'approved', overall_condition: overall,
+    // Save non-protected fields via direct update (allowed by column-level grants)
+    const { error: draftError } = await supabase.from('inspections').update({
+      overall_condition: overall,
       investment_guidance: guidance || null,
       manager_notes: managerNotes || null,
       executive_summary: executiveSummary || null, primary_recommendation: primaryRecommendation || null,
-      report_approved: true, approved_at: new Date().toISOString(),
-      approved_by: profile?.id || null,
     }).eq('id', inspection.id);
 
-    if (approvalError || priorityResults.some(result => result.error)) {
+    if (draftError || priorityResults.some(result => result.error)) {
+      setSaving(false);
+      setFeedback({ type: 'error', message: 'The report could not be saved. Please check your connection and try again.' });
+      return;
+    }
+
+    // Approve via SECURITY DEFINER function (enforces role + correction check at DB level)
+    const { error: approvalError } = await supabase.rpc('approve_inspection', { inspection_id: inspection.id });
+
+    if (approvalError) {
       setSaving(false);
       setFeedback({ type: 'error', message: 'The report could not be approved. Please check your connection and try again.' });
       return;
@@ -202,9 +210,7 @@ export function ReviewInspectionPage() {
       setFeedback({ type: 'success', message: 'Report sent using the temporary test sender.' });
     }
 
-    await supabase.from('inspections').update({
-      status: 'sent', report_sent: true, report_sent_at: new Date().toISOString(),
-    }).eq('id', inspection.id);
+    await supabase.rpc('send_inspection_report_fn', { inspection_id: inspection.id });
     setSaving(false);
     navigate(`/inspection/${inspection.id}`);
   }
@@ -232,11 +238,10 @@ export function ReviewInspectionPage() {
     if (!inspection || !correctionNotes.trim()) return;
     setSaving(true);
     setFeedback(null);
-    const { error } = await withTimeout(supabase.from('inspections').update({
-      status: 'in_progress',
-      correction_notes: correctionNotes.trim(),
-      correction_requested_at: new Date().toISOString(),
-    }).eq('id', inspection.id));
+    const { error } = await supabase.rpc('request_correction_fn', {
+      inspection_id: inspection.id,
+      notes: correctionNotes.trim(),
+    });
     setSaving(false);
     if (error) {
       setFeedback({ type: 'error', message: 'Could not request a correction. Please check your connection and try again.' });
@@ -248,10 +253,9 @@ export function ReviewInspectionPage() {
   async function dismissCorrection() {
     if (!inspection) return;
     setSaving(true);
-    const { error } = await withTimeout(supabase.from('inspections').update({
-      correction_notes: null,
-      correction_requested_at: null,
-    }).eq('id', inspection.id));
+    const { error } = await supabase.rpc('resolve_correction', {
+      inspection_id: inspection.id,
+    });
     setSaving(false);
     if (error) {
       setFeedback({ type: 'error', message: 'Could not dismiss the correction request. Please try again.' });

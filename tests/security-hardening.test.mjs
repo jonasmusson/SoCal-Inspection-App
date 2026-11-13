@@ -125,17 +125,14 @@ test('validateReport blocks approval when correction_requested_at is set', () =>
   assert.ok(/validateReport[\s\S]*correction_requested_at/s.test(reviewPage));
 });
 
-test('Review page has Request Correction function that sets correction_notes and correction_requested_at', () => {
+test('Review page has Request Correction function that calls request_correction_fn RPC', () => {
   assert.ok(reviewPage.includes('requestCorrection'));
-  assert.ok(reviewPage.includes('correction_notes'));
-  assert.ok(reviewPage.includes('correction_requested_at'));
-  assert.ok(reviewPage.includes("status: 'in_progress'"));
+  assert.ok(reviewPage.includes("supabase.rpc('request_correction_fn'"));
 });
 
-test('Review page has dismissCorrection that clears correction fields', () => {
+test('Review page has dismissCorrection that calls resolve_correction RPC', () => {
   assert.ok(reviewPage.includes('dismissCorrection'));
-  assert.ok(/correction_notes: null/s.test(reviewPage));
-  assert.ok(/correction_requested_at: null/s.test(reviewPage));
+  assert.ok(reviewPage.includes("supabase.rpc('resolve_correction'"));
 });
 
 test('Review page shows Correction Requested banner with notes and timestamp', () => {
@@ -167,6 +164,13 @@ test('Review page records approved_by on approval', () => {
 test('Pending migration blocks approval when correction is unresolved (approve_inspection checks correction_requested_at)', () => {
   assert.ok(pendingMigration.includes('correction_requested_at IS NOT NULL'));
   assert.ok(/Cannot approve.*correction|unresolved correction/i.test(pendingMigration));
+  // resolve_correction is manager/owner-only — techs cannot dismiss corrections
+  assert.ok(/resolve_correction[\s\S]*caller_role = 'tech'[\s\S]*RAISE EXCEPTION/s.test(pendingMigration));
+  // correction_notes and correction_requested_at are NOT in the granted UPDATE columns
+  const grantSection = pendingMigration.match(/GRANT UPDATE \([\s\S]*?\) ON inspections TO authenticated/);
+  assert.ok(grantSection);
+  assert.ok(!grantSection[0].includes('correction_notes'));
+  assert.ok(!grantSection[0].includes('correction_requested_at'));
 });
 
 // ─── 4. Report Access Control ────────────────────────────────────────────────
