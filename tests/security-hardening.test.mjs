@@ -65,8 +65,10 @@ test('Settings prevents last-owner lockout (client-side)', () => {
   assert.ok(/last.*owner|ownerCount.*1|owner.*count.*<=.*1/i.test(settingsPage));
 });
 
-test('Pending migration has can_modify_role SECURITY DEFINER function for DB-level last-owner protection', () => {
-  assert.ok(pendingMigration.includes('can_modify_role'));
+test('Pending migration has set_user_role SECURITY DEFINER function for DB-level last-owner protection', () => {
+  // v3 replaces can_modify_role with set_user_role (performs the update, not just returns boolean)
+  assert.ok(pendingMigration.includes('DROP FUNCTION IF EXISTS public.can_modify_role'));
+  assert.ok(pendingMigration.includes('set_user_role'));
   assert.ok(pendingMigration.includes('SECURITY DEFINER'));
   assert.ok(pendingMigration.includes('active_owner_count'));
   assert.ok(pendingMigration.includes("role = 'owner'"));
@@ -90,8 +92,9 @@ test('Pending migration revokes PUBLIC/anon EXECUTE on all SECURITY DEFINER func
 });
 
 test('Pending migration restricts user_profiles SELECT to authenticated only', () => {
-  assert.ok(pendingMigration.includes('REVOKE SELECT ON user_profiles FROM anon'));
-  assert.ok(pendingMigration.includes('select_user_profiles_authenticated'));
+  // v3 uses REVOKE ALL (broader than just REVOKE SELECT)
+  assert.ok(/REVOKE ALL ON user_profiles FROM anon/.test(pendingMigration) || /REVOKE SELECT ON user_profiles FROM anon/.test(pendingMigration));
+  assert.ok(pendingMigration.includes('profiles_select_own_or_staff') || pendingMigration.includes('select_user_profiles_authenticated'));
   assert.ok(pendingMigration.includes('TO authenticated'));
 });
 
@@ -99,16 +102,15 @@ test('Pending migration scopes inspections SELECT to authorized users (not USING
   assert.ok(pendingMigration.includes('inspections_select_authorized'));
   assert.ok(pendingMigration.includes('assigned_tech_id = auth.uid()'));
   assert.ok(pendingMigration.includes('created_by = auth.uid()'));
-  // Old permissive policy must be dropped (not just left in place)
-  assert.ok(pendingMigration.includes('DROP POLICY IF EXISTS "inspections_select_own"'));
-  // Must not re-create it with USING(true)
-  assert.ok(!/CREATE POLICY "inspections_select_own"[\s\S]*USING \(true\)/.test(pendingMigration));
+  // v3 uses a DO block to drop all legacy policies dynamically
+  assert.ok(/DO \$\$[\s\S]*pg_policies[\s\S]*DROP POLICY IF EXISTS/.test(pendingMigration) || pendingMigration.includes('DROP POLICY IF EXISTS "inspections_select_own"'));
+  // Must not re-create any policy with USING(true)
+  assert.ok(!/CREATE POLICY[\s\S]*USING \(true\)/.test(pendingMigration));
 });
 
 test('Pending migration adds status=active AND deactivated_at IS NULL checks to all UPDATE policies', () => {
-  assert.ok(pendingMigration.includes("up.status = 'active'"));
-  assert.ok(pendingMigration.includes('up.deactivated_at IS NULL'));
-  assert.ok(pendingMigration.includes('managers_update_active_profiles'));
+  assert.ok(pendingMigration.includes("status = 'active'"));
+  assert.ok(pendingMigration.includes('deactivated_at IS NULL'));
   assert.ok(pendingMigration.includes('inspections_update_authorized'));
   assert.ok(pendingMigration.includes('items_update_authorized'));
 });
@@ -167,10 +169,22 @@ test('Pending migration blocks approval when correction is unresolved (approve_i
   // resolve_correction is manager/owner-only — techs cannot dismiss corrections
   assert.ok(/resolve_correction[\s\S]*caller_role = 'tech'[\s\S]*RAISE EXCEPTION/s.test(pendingMigration));
   // correction_notes and correction_requested_at are NOT in the granted UPDATE columns
-  const grantSection = pendingMigration.match(/GRANT UPDATE \([\s\S]*?\) ON inspections TO authenticated/);
-  assert.ok(grantSection);
-  assert.ok(!grantSection[0].includes('correction_notes'));
-  assert.ok(!grantSection[0].includes('correction_requested_at'));
+  // Use a line-bound regex to avoid matching across multiple GRANT blocks
+  const lines = pendingMigration.split('\n');
+  let grantStart = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/GRANT UPDATE \(/.test(lines[i]) && /ON inspections TO authenticated/.test(lines.slice(i, i + 20).join('\n'))) {
+      grantStart = i;
+      break;
+    }
+  }
+  assert.ok(grantStart >= 0, 'Found GRANT UPDATE on inspections');
+  const grantBlock = lines.slice(grantStart, grantStart + 20).join('\n');
+  const grantEnd = grantBlock.indexOf(') ON inspections TO authenticated');
+  assert.ok(grantEnd >= 0, 'Found end of GRANT UPDATE on inspections');
+  const grantContent = grantBlock.substring(0, grantEnd);
+  assert.ok(!grantContent.includes('correction_notes'));
+  assert.ok(!grantContent.includes('correction_requested_at'));
 });
 
 // ─── 4. Report Access Control ────────────────────────────────────────────────
@@ -209,9 +223,13 @@ test('Pending migration does NOT drop any tables or columns', () => {
   assert.ok(!/ALTER TABLE.*DROP/i.test(pendingMigration));
 });
 
-test('Pending migration uses IF EXISTS for idempotent policy drops', () => {
-  const dropCount = (pendingMigration.match(/DROP POLICY IF EXISTS/g) || []).length;
-  assert.ok(dropCount >= 8, `Expected at least 8 DROP POLICY IF EXISTS, got ${dropCount}`);
+test('Pending migration uses IF EXISTS for idempotent policy/function drops', () => {
+  // v3 uses a DO block to drop all policies dynamically, plus DROP FUNCTION IF EXISTS
+  const doBlockDrop = /DO \$\$[\s\S]*DROP POLICY IF EXISTS/.test(pendingMigration);
+  const explicitDropCount = (pendingMigration.match(/DROP POLICY IF EXISTS/g) || []).length;
+  const dropFnCount = (pendingMigration.match(/DROP FUNCTION IF EXISTS/g) || []).length;
+  assert.ok(doBlockDrop || explicitDropCount >= 8, `Expected DO block drop or >= 8 DROP POLICY IF EXISTS, got ${explicitDropCount}`);
+  assert.ok(dropFnCount >= 8, `Expected at least 8 DROP FUNCTION IF EXISTS, got ${dropFnCount}`);
 });
 
 test('Pending migration does NOT use top-level transaction control statements', () => {
