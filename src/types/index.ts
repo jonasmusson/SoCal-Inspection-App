@@ -17,6 +17,7 @@ export interface UserProfile {
   phone: string | null;
   created_at: string;
   updated_at: string;
+  deactivated_at: string | null;
 }
 
 export interface CheckinPhoto {
@@ -82,6 +83,9 @@ export interface Inspection {
   updated_at: string;
   completed_at: string | null;
   approved_at: string | null;
+  approved_by: string | null;
+  correction_notes: string | null;
+  correction_requested_at: string | null;
   template_id: string | null;
   archived: boolean;
   archived_at: string | null;
@@ -116,6 +120,7 @@ export interface InspectionItem {
   parts_cost_low: number | null;
   parts_cost_high: number | null;
   priority: PriorityLevel | null;
+  manager_note: string | null;
   photo_required: boolean;
   video_required: boolean;
   notes_required: boolean;

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Inspection, InspectionSection, InspectionItem, InspectionPhoto, InspectionVideo, CheckinPhoto, ItemCondition, PriorityLevel } from '../types';
-import { ArrowLeft, Check, AlertTriangle, Eye, Send, Eye as Preview, ClipboardList, MinusCircle, Save, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Check, AlertTriangle, Eye, Send, Eye as Preview, ClipboardList, MinusCircle, Save, Link as LinkIcon, Video } from 'lucide-react';
 import { withTimeout } from '../lib/async';
 import { InspectionReport } from '../components/report/InspectionReport';
 
@@ -17,7 +17,7 @@ const PRIORITY_OPTIONS: { value: PriorityLevel; label: string; color: string; bg
 export function ReviewInspectionPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isManager, isOwner } = useAuth();
+  const { isManager, isOwner, profile } = useAuth();
 
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [sections, setSections] = useState<InspectionSection[]>([]);
@@ -38,6 +38,10 @@ export function ReviewInspectionPage() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [laborRate, setLaborRate] = useState(175);
+  const [correctionNotes, setCorrectionNotes] = useState('');
+  const [showCorrectionForm, setShowCorrectionForm] = useState(false);
+  const [itemManagerNotes, setItemManagerNotes] = useState<Record<string, string>>({});
+  const [activeFilter, setActiveFilter] = useState<'all' | 'immediate' | 'future' | 'good' | 'not_inspected'>('all');
 
   useEffect(() => { if (id) loadInspection(id); }, [id]);
   useEffect(() => { if (!isManager && !isOwner) navigate('/'); }, [isManager, isOwner, navigate]);
@@ -74,6 +78,9 @@ export function ReviewInspectionPage() {
         const p: Record<string, PriorityLevel> = {};
         loaded.forEach(i => { if (i.priority) p[i.id] = i.priority as PriorityLevel; });
         setPriorities(p);
+        const mn: Record<string, string> = {};
+        loaded.forEach(i => { if (i.manager_note) mn[i.id] = i.manager_note; });
+        setItemManagerNotes(mn);
         if (loaded.length) {
           const [photoResult, videoResult] = await Promise.all([
             withTimeout(supabase.from('inspection_photos').select('*').in('item_id', loaded.map(i=>i.id))),
@@ -158,6 +165,7 @@ export function ReviewInspectionPage() {
       manager_notes: managerNotes || null,
       executive_summary: executiveSummary || null, primary_recommendation: primaryRecommendation || null,
       report_approved: true, approved_at: new Date().toISOString(),
+      approved_by: profile?.id || null,
     }).eq('id', inspection.id);
 
     if (approvalError || priorityResults.some(result => result.error)) {
@@ -166,7 +174,7 @@ export function ReviewInspectionPage() {
       return;
     }
 
-    setInspection(prev => prev ? { ...prev, status: 'approved', overall_condition: overall, report_approved: true } : prev);
+    setInspection(prev => prev ? { ...prev, status: 'approved', overall_condition: overall, report_approved: true, approved_by: profile?.id || null } : prev);
     setSaving(false);
     setActiveTab('preview');
     setFeedback({ type: 'success', message: 'Report approved. You can print it or save it as a PDF now. Email delivery can be completed later.' });
@@ -209,6 +217,44 @@ export function ReviewInspectionPage() {
     } catch {
       setFeedback({ type: 'error', message: `Copy this customer report link: ${reportUrl}` });
     }
+  }
+
+  async function saveManagerNote(itemId: string) {
+    const note = itemManagerNotes[itemId] ?? '';
+    await withTimeout(supabase.from('inspection_items').update({ manager_note: note || null }).eq('id', itemId));
+  }
+
+  async function requestCorrection() {
+    if (!inspection || !correctionNotes.trim()) return;
+    setSaving(true);
+    setFeedback(null);
+    const { error } = await withTimeout(supabase.from('inspections').update({
+      status: 'in_progress',
+      correction_notes: correctionNotes.trim(),
+      correction_requested_at: new Date().toISOString(),
+    }).eq('id', inspection.id));
+    setSaving(false);
+    if (error) {
+      setFeedback({ type: 'error', message: 'Could not request a correction. Please check your connection and try again.' });
+      return;
+    }
+    navigate(`/inspection/${inspection.id}`);
+  }
+
+  async function dismissCorrection() {
+    if (!inspection) return;
+    setSaving(true);
+    const { error } = await withTimeout(supabase.from('inspections').update({
+      correction_notes: null,
+      correction_requested_at: null,
+    }).eq('id', inspection.id));
+    setSaving(false);
+    if (error) {
+      setFeedback({ type: 'error', message: 'Could not dismiss the correction request. Please try again.' });
+      return;
+    }
+    setInspection(prev => prev ? { ...prev, correction_notes: null, correction_requested_at: null } : prev);
+    setFeedback({ type: 'success', message: 'Correction request acknowledged.' });
   }
 
   if (loading) return <div className="p-4 text-center text-gray-500">Loading...</div>;
@@ -256,6 +302,51 @@ export function ReviewInspectionPage() {
       {/* ── EDIT TAB ── */}
       {activeTab === 'edit' && (
         <div className="p-4 space-y-4">
+          {/* Correction Requested banner */}
+          {inspection.correction_notes && (
+            <div className="rounded-xl border border-warning-300 bg-warning-50 p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-warning-600" />
+                <h2 className="font-semibold text-warning-800">Correction Requested</h2>
+              </div>
+              <p className="text-sm text-warning-800">{inspection.correction_notes}</p>
+              {inspection.correction_requested_at && (
+                <p className="text-xs text-warning-700">Requested {new Date(inspection.correction_requested_at).toLocaleString()}</p>
+              )}
+              <button onClick={dismissCorrection} disabled={saving}
+                className="rounded-lg border border-warning-300 bg-white px-3 py-1.5 text-xs font-semibold text-warning-800 hover:bg-warning-100 disabled:opacity-50">
+                Acknowledge
+              </button>
+            </div>
+          )}
+
+          {/* Request Correction */}
+          {inspection.status === 'pending_review' && !showCorrectionForm && (
+            <button onClick={() => setShowCorrectionForm(true)}
+              className="w-full rounded-xl border border-warning-300 bg-warning-50 px-4 py-3 text-sm font-semibold text-warning-800 hover:bg-warning-100 flex items-center justify-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> Request Correction
+            </button>
+          )}
+          {showCorrectionForm && (
+            <div className="rounded-xl border border-warning-300 bg-white p-4 space-y-3">
+              <h2 className="font-semibold text-gray-900">Request Correction</h2>
+              <p className="text-xs text-gray-500">The inspection will be sent back to the tech for corrections.</p>
+              <textarea value={correctionNotes} onChange={e => setCorrectionNotes(e.target.value)}
+                placeholder="Explain what needs to be corrected..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none" rows={3} />
+              <div className="flex gap-2">
+                <button onClick={requestCorrection} disabled={saving || !correctionNotes.trim()}
+                  className="flex-1 rounded-xl bg-warning-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-warning-700 disabled:opacity-50">
+                  {saving ? 'Sending...' : 'Send Back to Tech'}
+                </button>
+                <button onClick={() => { setShowCorrectionForm(false); setCorrectionNotes(''); }}
+                  className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 space-y-4">
             <div>
               <h2 className="font-semibold text-gray-900">Executive Summary</h2>
@@ -297,8 +388,26 @@ export function ReviewInspectionPage() {
             </select>
           </div>
 
+          {/* Filter pills */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {([
+              { key: 'all', label: 'All' },
+              { key: 'immediate', label: 'Immediate' },
+              { key: 'future', label: 'Future' },
+              { key: 'good', label: 'Good' },
+              { key: 'not_inspected', label: 'Not Inspected' },
+            ] as const).map(f => (
+              <button key={f.key} onClick={() => setActiveFilter(f.key)}
+                className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  activeFilter === f.key ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           {/* Needs Attention */}
-          {needsAttention.length > 0 && (
+          {needsAttention.length > 0 && (activeFilter === 'all' || activeFilter === 'immediate') && (
             <div className="bg-white rounded-xl shadow-sm border border-danger-200">
               <div className="p-4 border-b border-danger-100 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-danger-500" />
@@ -336,6 +445,38 @@ export function ReviewInspectionPage() {
                           </button>
                         ))}
                       </div>
+                      {(() => {
+                        const itemPhotos = photos.filter(p => p.item_id === item.id);
+                        const itemVideos = videos.filter(v => v.item_id === item.id);
+                        return (
+                          <>
+                            {itemPhotos.length > 0 && (
+                              <div className="mt-3">
+                                <div className="grid grid-cols-4 gap-1.5">
+                                  {itemPhotos.slice(0, 4).map(ph => (
+                                    <a key={ph.id} href={ph.photo_url} target="_blank" rel="noreferrer"
+                                      className="block aspect-square overflow-hidden rounded-lg border border-gray-200">
+                                      <img src={ph.photo_url} alt={ph.caption || item.item_name} className="w-full h-full object-cover" />
+                                    </a>
+                                  ))}
+                                </div>
+                                {itemPhotos.length > 4 && <p className="text-xs text-gray-400 mt-1">+{itemPhotos.length - 4} more photos</p>}
+                              </div>
+                            )}
+                            {itemVideos.length > 0 && (
+                              <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                                <Video className="w-3.5 h-3.5" /> {itemVideos.length} video{itemVideos.length > 1 ? 's' : ''}
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
+                      <div className="mt-3">
+                        <label className="block text-xs text-gray-400 mb-1">Manager note</label>
+                        <textarea value={itemManagerNotes[item.id] || ''} onChange={e => setItemManagerNotes(prev => ({ ...prev, [item.id]: e.target.value }))} onBlur={() => saveManagerNote(item.id)}
+                          placeholder="Add a manager note for this item..."
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs resize-none" rows={2} />
+                      </div>
                     </div>
                   );
                 })}
@@ -344,7 +485,7 @@ export function ReviewInspectionPage() {
           )}
 
           {/* Monitor */}
-          {monitor.length > 0 && (
+          {monitor.length > 0 && (activeFilter === 'all' || activeFilter === 'future') && (
             <div className="bg-white rounded-xl shadow-sm border border-warning-200">
               <div className="p-4 border-b border-warning-100 flex items-center gap-2">
                 <Eye className="w-5 h-5 text-warning-500" />
@@ -358,6 +499,20 @@ export function ReviewInspectionPage() {
                       <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
                       <p className="text-xs text-gray-400">{sec?.section_name}</p>
                       {item.notes && <p className="text-sm text-gray-500 mt-1 italic">"{item.notes}"</p>}
+                      {(() => {
+                        const itemVideos = videos.filter(v => v.item_id === item.id);
+                        return itemVideos.length > 0 ? (
+                          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <Video className="w-3.5 h-3.5" /> {itemVideos.length} video{itemVideos.length > 1 ? 's' : ''}
+                          </p>
+                        ) : null;
+                      })()}
+                      <div className="mt-2">
+                        <label className="block text-xs text-gray-400 mb-1">Manager note</label>
+                        <textarea value={itemManagerNotes[item.id] || ''} onChange={e => setItemManagerNotes(prev => ({ ...prev, [item.id]: e.target.value }))} onBlur={() => saveManagerNote(item.id)}
+                          placeholder="Add a manager note for this item..."
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs resize-none" rows={2} />
+                      </div>
                     </div>
                   );
                 })}
@@ -366,7 +521,7 @@ export function ReviewInspectionPage() {
           )}
 
           {/* All Good summary */}
-          {good.length > 0 && (
+          {good.length > 0 && (activeFilter === 'all' || activeFilter === 'good') && (
             <div className="bg-white rounded-xl shadow-sm border border-success-200">
               <div className="p-4 border-b border-success-100 flex items-center gap-2">
                 <Check className="w-5 h-5 text-success-500" />
@@ -381,7 +536,7 @@ export function ReviewInspectionPage() {
               </div>
             </div>
           )}
-          {notInspected.length>0 && <div className="bg-white rounded-xl shadow-sm border border-gray-200"><div className="p-4 border-b flex items-center gap-2"><MinusCircle className="w-5 h-5 text-gray-500"/><h2 className="font-semibold">Not Inspected ({notInspected.length})</h2></div>{notInspected.map(i=><div key={i.id} className="px-4 py-3 border-t"><p className="text-sm font-medium">{i.item_name}</p><p className="text-xs text-gray-500">{i.not_inspected_reason}</p></div>)}</div>}
+          {notInspected.length>0 && (activeFilter === 'all' || activeFilter === 'not_inspected') && <div className="bg-white rounded-xl shadow-sm border border-gray-200"><div className="p-4 border-b flex items-center gap-2"><MinusCircle className="w-5 h-5 text-gray-500"/><h2 className="font-semibold">Not Inspected ({notInspected.length})</h2></div>{notInspected.map(i=><div key={i.id} className="px-4 py-3 border-t"><p className="text-sm font-medium">{i.item_name}</p><p className="text-xs text-gray-500">{i.not_inspected_reason}</p></div>)}</div>}
 
           {/* Manager Notes */}
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">

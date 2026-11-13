@@ -4,13 +4,14 @@ import { useAuth } from '../hooks/useAuth';
 import { UserProfile, UserRole, EmailTemplate, ShopSetting } from '../types';
 import {
   Users, Clock, CheckCircle, Mail, ChevronDown, Save, Store, Wrench,
+  UserX, AlertCircle,
 } from 'lucide-react';
 import { withTimeout } from '../lib/async';
 
 type Tab = 'pending' | 'team' | 'email' | 'shop';
 
 export function SettingsPage() {
-  const { isOwner, isManager } = useAuth();
+  const { isOwner, isManager, profile } = useAuth();
   const canAccess = isOwner || isManager;
 
   const [tab, setTab] = useState<Tab>('pending');
@@ -31,6 +32,10 @@ export function SettingsPage() {
   const [shopSettings, setShopSettings] = useState<Record<string, string>>({});
   const [savingShop, setSavingShop] = useState(false);
   const [shopSaved, setShopSaved] = useState(false);
+  const [shopError, setShopError] = useState(false);
+  const [emailError, setEmailError] = useState(false);
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (canAccess) loadAll();
@@ -90,30 +95,74 @@ export function SettingsPage() {
   }
 
   async function changeRole(userId: string, role: UserRole) {
-    await supabase.from('user_profiles').update({ role }).eq('id', userId);
+    if (profile?.id === userId && role !== 'owner' && isOwner) {
+      setRoleError('You cannot demote yourself from owner. Ask another owner to change your role.');
+      return;
+    }
+    const ownerCount = activeUsers.filter(u => u.role === 'owner').length;
+    if (ownerCount <= 1 && activeUsers.find(u => u.id === userId)?.role === 'owner' && role !== 'owner') {
+      setRoleError('Cannot demote the last owner. Promote another user to owner first.');
+      return;
+    }
+    setRoleError(null);
+    const { error } = await supabase.from('user_profiles').update({ role }).eq('id', userId);
+    if (error) {
+      setRoleError(`Failed to update role: ${error.message}`);
+      return;
+    }
     setActiveUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
+  }
+
+  async function toggleDeactivate(userId: string, currentlyActive: boolean) {
+    setDeactivatingId(userId);
+    const now = currentlyActive ? new Date().toISOString() : null;
+    const { error } = await supabase.from('user_profiles')
+      .update({ deactivated_at: now })
+      .eq('id', userId);
+    if (!error) {
+      setActiveUsers(prev => prev.map(u =>
+        u.id === userId ? { ...u, deactivated_at: now } : u
+      ));
+    }
+    setDeactivatingId(null);
   }
 
   async function saveEmailTemplate() {
     if (!emailTemplate) return;
     setSavingEmail(true);
-    await supabase.from('email_templates').update({
+    setEmailError(false);
+    const { error } = await supabase.from('email_templates').update({
       subject: editSubject,
       body: editBody,
       updated_at: new Date().toISOString(),
     }).eq('id', emailTemplate.id);
     setSavingEmail(false);
+    if (error) {
+      setEmailError(true);
+      return;
+    }
     setEmailSaved(true);
     setTimeout(() => setEmailSaved(false), 2500);
   }
 
   async function saveShopSettings() {
     setSavingShop(true);
+    setShopError(false);
+    const laborRate = Number(shopSettings['labor_rate']);
+    if (!Number.isFinite(laborRate) || laborRate < 0) {
+      setShopError(true);
+      setSavingShop(false);
+      return;
+    }
     const keys = ['shop_name', 'app_url', 'labor_rate', 'checkin_required_photos', 'checkin_video_required'];
-    await Promise.all(keys.map(key =>
+    const results = await Promise.all(keys.map(key =>
       supabase.from('shop_settings').upsert({ key, value: shopSettings[key] ?? '' }, { onConflict: 'key' })
     ));
     setSavingShop(false);
+    if (results.some(r => r.error)) {
+      setShopError(true);
+      return;
+    }
     setShopSaved(true);
     setTimeout(() => setShopSaved(false), 2500);
   }
@@ -135,6 +184,13 @@ export function SettingsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500 mt-1">Manage your team and notifications</p>
       </div>
+
+      {roleError && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm text-warning-700">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          {roleError}
+        </div>
+      )}
 
       {deliveryNotice && (
         <div className={`mb-4 rounded-xl border p-3 text-sm ${deliveryNotice.includes('sent to') ? 'bg-success-50 border-success-200 text-success-700' : 'bg-warning-50 border-warning-200 text-warning-700'}`}>
@@ -221,28 +277,48 @@ export function SettingsPage() {
                 <div className="p-8 text-center text-gray-400">No active team members</div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {activeUsers.map(u => (
-                    <div key={u.id} className="flex items-center gap-3 px-4 py-3">
+                  {activeUsers.map(u => {
+                    const isDeactivated = !!u.deactivated_at;
+                    const isSelf = profile?.id === u.id;
+                    const isLastOwner = u.role === 'owner' && activeUsers.filter(a => a.role === 'owner' && !a.deactivated_at).length <= 1;
+                    return (
+                    <div key={u.id} className={`flex items-center gap-3 px-4 py-3 ${isDeactivated ? 'opacity-50' : ''}`}>
                       <div className="w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
                         <span className="text-primary-700 font-semibold text-sm">
                           {u.full_name.charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">{u.full_name}</p>
+                        <p className="font-medium text-gray-900 truncate">
+                          {u.full_name}
+                          {isSelf && <span className="text-xs text-gray-400 ml-1">(you)</span>}
+                          {isDeactivated && <span className="text-xs text-gray-400 ml-1">— deactivated</span>}
+                        </p>
                         <p className="text-xs text-gray-500 truncate">{u.email}</p>
                       </div>
                       {isOwner ? (
-                        <div className="relative">
-                          <select
-                            value={u.role}
-                            onChange={e => changeRole(u.id, e.target.value as UserRole)}
-                            className="appearance-none pl-3 pr-7 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-gray-50">
-                            <option value="tech">Tech</option>
-                            <option value="manager">Manager</option>
-                            <option value="owner">Owner</option>
-                          </select>
-                          <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                        <div className="flex items-center gap-2">
+                          <div className="relative">
+                            <select
+                              value={u.role}
+                              onChange={e => changeRole(u.id, e.target.value as UserRole)}
+                              disabled={isDeactivated}
+                              className="appearance-none pl-3 pr-7 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-gray-50 disabled:opacity-50">
+                              <option value="tech">Tech</option>
+                              <option value="manager">Manager</option>
+                              <option value="owner">Owner</option>
+                            </select>
+                            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                          </div>
+                          {isOwner && !isSelf && !isLastOwner && (
+                            <button
+                              onClick={() => toggleDeactivate(u.id, !isDeactivated)}
+                              disabled={deactivatingId === u.id}
+                              title={isDeactivated ? 'Reactivate user' : 'Deactivate user'}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-danger-500 hover:bg-danger-50 disabled:opacity-50">
+                              <UserX className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -254,7 +330,8 @@ export function SettingsPage() {
                         </span>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -307,9 +384,11 @@ export function SettingsPage() {
                   onClick={saveEmailTemplate}
                   disabled={savingEmail}
                   className={`mt-3 w-full py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
-                    emailSaved ? 'bg-success-600 text-white' : 'bg-primary-600 hover:bg-primary-700 text-white'
+                    emailError ? 'bg-danger-600 text-white' : emailSaved ? 'bg-success-600 text-white' : 'bg-primary-600 hover:bg-primary-700 text-white'
                   } disabled:opacity-50`}>
-                  {emailSaved ? (
+                  {emailError ? (
+                    <><AlertCircle className="w-4 h-4" /> Save failed — try again</>
+                  ) : emailSaved ? (
                     <><CheckCircle className="w-4 h-4" /> Saved</>
                   ) : (
                     <><Save className="w-4 h-4" /> {savingEmail ? 'Saving...' : 'Save Template'}</>
@@ -401,9 +480,11 @@ export function SettingsPage() {
 
                 <button onClick={saveShopSettings} disabled={savingShop}
                   className={`mt-4 w-full py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
-                    shopSaved ? 'bg-success-600 text-white' : 'bg-primary-600 hover:bg-primary-700 text-white'
+                    shopError ? 'bg-danger-600 text-white' : shopSaved ? 'bg-success-600 text-white' : 'bg-primary-600 hover:bg-primary-700 text-white'
                   } disabled:opacity-50`}>
-                  {shopSaved ? (
+                  {shopError ? (
+                    <><AlertCircle className="w-4 h-4" /> Save failed — check values</>
+                  ) : shopSaved ? (
                     <><CheckCircle className="w-4 h-4" /> Saved</>
                   ) : (
                     <><Save className="w-4 h-4" /> {savingShop ? 'Saving...' : 'Save Settings'}</>

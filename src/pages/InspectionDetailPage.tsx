@@ -166,6 +166,22 @@ export function InspectionDetailPage() {
 
   return (
     <div className="p-4 pb-24 space-y-4">
+      {/* Correction requested banner */}
+      {inspection.correction_notes && inspection.correction_requested_at && (
+        <div className="rounded-xl border border-warning-200 bg-warning-50 p-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-5 h-5 text-warning-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-warning-800 text-sm">Correction Requested by Management</p>
+              <p className="text-sm text-warning-700 mt-1">{inspection.correction_notes}</p>
+              <p className="text-xs text-warning-500 mt-1">
+                Requested {format(new Date(inspection.correction_requested_at), 'MMM d, h:mm a')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header card */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
         <div className="flex justify-between items-start mb-3">
