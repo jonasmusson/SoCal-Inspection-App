@@ -96,7 +96,11 @@ export function InspectionDetailPage() {
   async function archiveInspection() {
     if (!inspection) return;
     setActionLoading(true);
-    await supabase.from('inspections').update({ archived: true, archived_at: new Date().toISOString() }).eq('id', inspection.id);
+    const { error } = await supabase.rpc('archive_inspection', { p_inspection_id: inspection.id });
+    if (error) {
+      setActionLoading(false);
+      return;
+    }
     setActionLoading(false);
     navigate(-1);
   }

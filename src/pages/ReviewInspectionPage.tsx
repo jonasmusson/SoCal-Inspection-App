@@ -115,13 +115,14 @@ export function ReviewInspectionPage() {
       )
     );
     const priorityError = priorityResults.find(result => result.error)?.error;
-    const { error: inspectionError } = await supabase.from('inspections').update({
-      overall_condition: overall,
-      investment_guidance: guidance || null,
-      manager_notes: managerNotes || null,
-      executive_summary: executiveSummary || null,
-      primary_recommendation: primaryRecommendation || null,
-    }).eq('id', inspection.id);
+    const { error: inspectionError } = await supabase.rpc('save_manager_review', {
+      p_inspection_id: inspection.id,
+      p_overall_condition: overall || null,
+      p_investment_guidance: guidance || null,
+      p_manager_notes: managerNotes || null,
+      p_executive_summary: executiveSummary || null,
+      p_primary_recommendation: primaryRecommendation || null,
+    });
     setSaving(false);
     if (priorityError || inspectionError) {
       setFeedback({ type: 'error', message: 'The review draft could not be saved. Please check your connection and try again.' });
@@ -163,13 +164,14 @@ export function ReviewInspectionPage() {
     );
     const priorityResults = await Promise.all(updates);
 
-    // Save non-protected fields via direct update (allowed by column-level grants)
-    const { error: draftError } = await supabase.from('inspections').update({
-      overall_condition: overall,
-      investment_guidance: guidance || null,
-      manager_notes: managerNotes || null,
-      executive_summary: executiveSummary || null, primary_recommendation: primaryRecommendation || null,
-    }).eq('id', inspection.id);
+    const { error: draftError } = await supabase.rpc('save_manager_review', {
+      p_inspection_id: inspection.id,
+      p_overall_condition: overall || null,
+      p_investment_guidance: guidance || null,
+      p_manager_notes: managerNotes || null,
+      p_executive_summary: executiveSummary || null,
+      p_primary_recommendation: primaryRecommendation || null,
+    });
 
     if (draftError || priorityResults.some(result => result.error)) {
       setSaving(false);

@@ -37,6 +37,24 @@ Once approved, apply via the Supabase MCP apply_migration tool.
 7. REAL PERMISSION TESTS: docs/post-deployment-verification-v3.sql contains
    queries to verify effective privileges for all 5 account types.
 
+## v3 Staging Fixes (from real database permission testing)
+
+8. MANAGER-ONLY COLUMN PROTECTION: Removed manager_notes, executive_summary,
+   primary_recommendation, overall_condition, investment_guidance,
+   report_access_token, archived, archived_at from the GRANT UPDATE list
+   on inspections. Created save_manager_review() and archive_inspection()
+   SECURITY DEFINER RPCs for managers/owners. Technicians can no longer
+   write these fields via direct API calls.
+
+9. REOPEN PROTECTION: inspections_update_authorized USING clause now
+   includes status NOT IN ('approved', 'sent') on tech/creator branches,
+   preventing technicians from reopening approved or sent inspections
+   by setting status back to in_progress.
+
+10. OWNER PROTECTION: set_user_role and set_user_status now require
+    caller to be an owner when the target is an owner. Managers can no
+    longer demote or deactivate owners.
+
 ## Security Issues Fixed (v2 — addresses original review findings)
 
 1. DEACTIVATED USERS: All RLS policies on every Inspection-App table now check
@@ -166,6 +184,10 @@ BEGIN
     RAISE EXCEPTION 'Target user not found';
   END IF;
 
+  IF target_role = 'owner' AND caller_role != 'owner' THEN
+    RAISE EXCEPTION 'Only owners can modify the role of another owner';
+  END IF;
+
   IF target_role = 'owner' AND new_role != 'owner' THEN
     SELECT count(*) INTO active_owner_count FROM user_profiles
       WHERE role = 'owner' AND status = 'active' AND deactivated_at IS NULL
@@ -177,7 +199,7 @@ BEGIN
 
   UPDATE user_profiles SET role = new_role WHERE id = target_user_id;
 END;
-$$;
+$;
 
 REVOKE ALL ON FUNCTION public.set_user_role(uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.set_user_role(uuid, text) TO authenticated;
@@ -214,6 +236,10 @@ BEGIN
 
   IF target_user_id = auth.uid() THEN
     RAISE EXCEPTION 'You cannot deactivate your own account';
+  END IF;
+
+  IF target_role = 'owner' AND caller_role != 'owner' THEN
+    RAISE EXCEPTION 'Only owners can deactivate or reactivate another owner';
   END IF;
 
   IF new_status = 'pending' AND target_role = 'owner' AND target_current_status = 'active' THEN
@@ -410,6 +436,74 @@ REVOKE ALL ON FUNCTION public.get_tech_profiles() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_tech_profiles() TO authenticated;
 
 -- ============================================================
+-- 8a. save_manager_review — manager/owner RPC for review content
+--     Replaces direct table UPDATE for manager-only columns
+-- ============================================================
+DROP FUNCTION IF EXISTS public.save_manager_review(uuid, text, text, text, text, text);
+
+CREATE OR REPLACE FUNCTION public.save_manager_review(
+  p_inspection_id uuid,
+  p_overall_condition text DEFAULT NULL,
+  p_investment_guidance text DEFAULT NULL,
+  p_manager_notes text DEFAULT NULL,
+  p_executive_summary text DEFAULT NULL,
+  p_primary_recommendation text DEFAULT NULL
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+DECLARE
+  caller_role text;
+BEGIN
+  SELECT role INTO caller_role FROM user_profiles
+    WHERE id = auth.uid() AND status = 'active' AND deactivated_at IS NULL;
+  IF caller_role IS NULL OR caller_role NOT IN ('manager', 'owner') THEN
+    RAISE EXCEPTION 'Only active managers or owners can save review content';
+  END IF;
+  UPDATE inspections
+    SET
+      overall_condition = p_overall_condition,
+      investment_guidance = p_investment_guidance,
+      manager_notes = p_manager_notes,
+      executive_summary = p_executive_summary,
+      primary_recommendation = p_primary_recommendation
+    WHERE id = p_inspection_id;
+END;
+$;
+REVOKE ALL ON FUNCTION public.save_manager_review(uuid, text, text, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.save_manager_review(uuid, text, text, text, text, text) TO authenticated;
+
+-- ============================================================
+-- 8b. archive_inspection — manager/owner RPC for archiving
+--     Replaces direct table UPDATE for archived/archived_at columns
+-- ============================================================
+DROP FUNCTION IF EXISTS public.archive_inspection(uuid);
+
+CREATE OR REPLACE FUNCTION public.archive_inspection(p_inspection_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+DECLARE
+  caller_role text;
+  current_status text;
+BEGIN
+  SELECT role INTO caller_role FROM user_profiles
+    WHERE id = auth.uid() AND status = 'active' AND deactivated_at IS NULL;
+  IF caller_role IS NULL OR caller_role NOT IN ('manager', 'owner') THEN
+    RAISE EXCEPTION 'Only active managers or owners can archive inspections';
+  END IF;
+  SELECT status INTO current_status FROM inspections WHERE id = p_inspection_id;
+  IF current_status IS NULL THEN
+    RAISE EXCEPTION 'Inspection not found';
+  END IF;
+  IF current_status != 'sent' THEN
+    RAISE EXCEPTION 'Only sent inspections can be archived';
+  END IF;
+  UPDATE inspections
+    SET archived = true, archived_at = now()
+    WHERE id = p_inspection_id;
+END;
+$;
+REVOKE ALL ON FUNCTION public.archive_inspection(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.archive_inspection(uuid) TO authenticated;
+
+-- ============================================================
 -- 9. Column-level privileges: user_profiles
 --    REVOKE ALL, then re-grant only SELECT + UPDATE on user-editable cols.
 --    role, status, deactivated_at, email are NOT directly writable.
@@ -424,22 +518,28 @@ GRANT UPDATE (full_name, first_name, last_name, phone) ON user_profiles TO authe
 --     REVOKE UPDATE at table level, re-grant on specific columns only.
 --     Protected columns (only set by SECURITY DEFINER functions):
 --       report_approved, report_sent, report_sent_at, approved_at,
---       approved_by, correction_notes, correction_requested_at
+--       approved_by, correction_notes, correction_requested_at,
+--       manager_notes, executive_summary, primary_recommendation,
+--       overall_condition, investment_guidance, report_access_token,
+--       archived, archived_at
+--     These manager-only columns are NOT in the GRANT UPDATE list.
+--     Managers save review content via save_manager_review() RPC.
+--     Archiving is done via archive_inspection() RPC.
 --     status IS granted (techs need in_progress/pending_review) but
---     RLS WITH CHECK blocks techs from setting 'approved' or 'sent'.
+--     RLS WITH CHECK blocks techs from setting 'approved' or 'sent'
+--     and blocks techs from updating approved/sent inspections.
 -- ============================================================
 
 REVOKE UPDATE ON inspections FROM anon, authenticated;
 GRANT UPDATE (
   customer_first_name, customer_last_name, customer_phone, customer_email,
   vehicle_year, vehicle_make, vehicle_model, vehicle_vin, vehicle_mileage,
-  status, progress_percent, assigned_tech_id, created_by, manager_notes,
-  tech_notes, overall_condition, investment_guidance, report_access_token,
+  status, progress_percent, assigned_tech_id, created_by,
+  tech_notes,
   checkin_notes, checkin_video_url, checkin_complete, work_started_at,
-  work_completed_at, completed_at, archived, archived_at, paused_at,
+  work_completed_at, completed_at, paused_at,
   paused_duration_seconds, vehicle_color, customer_city, customer_state,
-  customer_zip, customer_address, executive_summary, primary_recommendation,
-  checkin_step
+  customer_zip, customer_address, checkin_step
 ) ON inspections TO authenticated;
 
 -- ============================================================
@@ -520,8 +620,10 @@ CREATE POLICY "inspections_update_authorized" ON inspections FOR UPDATE
   TO authenticated
   USING (
     (public.is_manager_or_owner())
-    OR (assigned_tech_id = auth.uid() AND public.is_active_staff())
-    OR (created_by = auth.uid() AND public.is_active_staff())
+    OR (assigned_tech_id = auth.uid() AND public.is_active_staff()
+        AND status NOT IN ('approved', 'sent'))
+    OR (created_by = auth.uid() AND public.is_active_staff()
+        AND status NOT IN ('approved', 'sent'))
   )
   WITH CHECK (
     (public.is_manager_or_owner())
