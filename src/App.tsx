@@ -45,11 +45,11 @@ function ProfileErrorScreen() {
         <p className="text-gray-700 font-medium mb-2">Could not load your profile.</p>
         <p className="text-gray-500 text-sm mb-6">This is usually a network or permissions issue.</p>
         <button onClick={retryProfile}
-          className="px-6 py-3 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 mr-3">
+          className="px-6 py-3 bg-accent-500 text-white rounded-xl font-semibold hover:bg-accent-600 mr-3 transition-colors">
           Retry
         </button>
         <button onClick={signOut}
-          className="px-6 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50">
+          className="px-6 py-3 border border-gray-200 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
           Sign Out
         </button>
       </div>
@@ -62,9 +62,9 @@ function PendingApprovalScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-sm w-full">
-        <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-warning-100 mb-4">
-            <Clock className="w-8 h-8 text-warning-500" />
+        <div className="bg-white rounded-2xl shadow-elevated p-8 text-center animate-slide-up">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-warning-100 mb-4">
+            <Clock className="w-7 h-7 text-warning-600" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Account Pending Approval</h2>
           <p className="text-gray-500 text-sm mb-2">
@@ -88,9 +88,9 @@ function DeactivatedScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-sm w-full">
-        <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-danger-100 mb-4">
-            <LogOut className="w-8 h-8 text-danger-500" />
+        <div className="bg-white rounded-2xl shadow-elevated p-8 text-center animate-slide-up">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-danger-100 mb-4">
+            <LogOut className="w-7 h-7 text-danger-600" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Account Deactivated</h2>
           <p className="text-gray-500 text-sm mb-6">

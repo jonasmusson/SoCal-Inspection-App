@@ -17,37 +17,29 @@ export function DashboardPage() {
   const { profile, isManager, isOwner } = useAuth();
   const navigate = useNavigate();
 
-  // All inspections (loaded unfiltered for accurate stats, filtered client-side)
   const [allInspections, setAllInspections] = useState<Inspection[]>([]);
   const [techs, setTechs] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  // Search with debounce (300ms timer ref, no library)
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Display filters (applied client-side after loading all)
   const [statusFilter, setStatusFilter] = useState('all');
   const [techFilter, setTechFilter] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
 
-  // Quick-assign tech state
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
 
-  // Debounce search input — 300ms
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => setDebouncedSearch(search), 300);
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
   }, [search]);
 
-  // Reload inspections when archive toggle changes (only filter applied server-side)
   useEffect(() => { loadInspections(); }, [showArchived]);
-
-  // Load tech list once on mount
   useEffect(() => { loadTechs(); }, []);
 
   async function loadInspections() {
@@ -81,7 +73,6 @@ export function DashboardPage() {
       );
       setTechs(data || []);
     } catch {
-      // Tech list is non-critical — dropdown just shows fewer options
     }
   }
 
@@ -96,14 +87,11 @@ export function DashboardPage() {
         prev.map(i => (i.id === inspectionId ? { ...i, assigned_tech_id: techId } : i)),
       );
     } catch {
-      // silent — card remains unassigned, user can retry
     } finally {
       setAssigning(false);
       setAssigningId(null);
     }
   }
-
-  // ── Derived values ──────────────────────────────────────────────
 
   const techMap = new Map(techs.map(t => [t.id, t]));
 
@@ -119,7 +107,6 @@ export function DashboardPage() {
 
   const hasActiveFilters = debouncedSearch !== '' || statusFilter !== 'all' || techFilter !== 'all';
 
-  // Client-side display filters (search, status, tech)
   const filtered = allInspections.filter(i => {
     if (debouncedSearch) {
       const q = debouncedSearch.toLowerCase();
@@ -137,16 +124,13 @@ export function DashboardPage() {
     return true;
   });
 
-  // Needs check-in — shown in the Resume Check-In section, excluded from grouped list
   const needsCheckin = filtered.filter(i => !i.checkin_complete);
-
-  // Remaining items for operational category grouping
   const groupedItems = filtered.filter(i => i.checkin_complete !== false);
 
   const groups: { key: string; label: string; icon: typeof Clock; color: string; items: Inspection[] }[] = [
     { key: 'unassigned', label: 'Unassigned', icon: UserPlus, color: 'text-warning-600',
       items: groupedItems.filter(i => i.status === 'not_started' && !i.assigned_tech_id) },
-    { key: 'inProgress', label: 'In Progress', icon: Clock, color: 'text-primary-500',
+    { key: 'inProgress', label: 'In Progress', icon: Clock, color: 'text-accent-600',
       items: groupedItems.filter(i => i.status === 'in_progress') },
     { key: 'awaitingReview', label: 'Awaiting Review', icon: AlertCircle, color: 'text-warning-500',
       items: groupedItems.filter(i => i.status === 'pending_review') },
@@ -156,7 +140,6 @@ export function DashboardPage() {
       items: groupedItems.filter(i => i.status === 'sent') },
   ];
 
-  // Recent activity — last 5 inspections by updated_at
   const recentActivity = [...allInspections]
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     .slice(0, 5);
@@ -178,45 +161,46 @@ export function DashboardPage() {
     return `/inspection/${i.id}`;
   }
 
-  // ── Guard returns ───────────────────────────────────────────────
-
   if (!profile) return null;
   if (!isManager && !isOwner) return <Navigate to="/my-inspections" replace />;
 
-  // ── Render ──────────────────────────────────────────────────────
-
   const statCards = [
-    { icon: AlertCircle, label: 'Pending Review', value: stats.pendingReview, color: 'text-warning-500' },
-    { icon: Clock, label: 'In Progress', value: stats.inProgress, color: 'text-primary-500' },
-    { icon: ClipboardList, label: 'Awaiting Check-In', value: stats.awaitingCheckin, color: 'text-warning-600' },
-    { icon: Send, label: 'Sent Today', value: stats.sentToday, color: 'text-success-500' },
+    { icon: AlertCircle, label: 'Pending Review', value: stats.pendingReview, color: 'text-warning-600', bg: 'bg-warning-50', ring: 'ring-warning-100' },
+    { icon: Clock, label: 'In Progress', value: stats.inProgress, color: 'text-accent-600', bg: 'bg-accent-50', ring: 'ring-accent-100' },
+    { icon: ClipboardList, label: 'Awaiting Check-In', value: stats.awaitingCheckin, color: 'text-primary-600', bg: 'bg-primary-50', ring: 'ring-primary-100' },
+    { icon: Send, label: 'Sent Today', value: stats.sentToday, color: 'text-success-600', bg: 'bg-success-50', ring: 'ring-success-100' },
   ];
 
   const showGrouped = !hasActiveFilters && !showArchived;
 
   return (
-    <div className="p-4 pb-24">
+    <div className="p-4 sm:p-6 pb-24 sm:pb-6 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500">Welcome back, {profile?.full_name}</p>
+      <div className="mb-6 animate-slide-up">
+        <h1 className="font-display text-3xl tracking-wide text-primary-900">Dashboard</h1>
+        <p className="text-gray-500 text-sm mt-0.5">Welcome back, {profile?.full_name}</p>
       </div>
 
-      {/* Stat Cards — 2 cols mobile, 4 cols desktop */}
+      {/* Stat Cards */}
       {!showArchived && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 animate-slide-up">
           {statCards.map(s => (
-            <div key={s.label} className="bg-white rounded-xl p-3 shadow-sm border border-gray-200 text-center">
-              <s.icon className={`w-5 h-5 ${s.color} mx-auto mb-1`} />
-              <p className="text-xl font-bold text-gray-900">{s.value}</p>
-              <p className="text-xs text-gray-500">{s.label}</p>
+            <div
+              key={s.label}
+              className={`bg-white rounded-2xl p-4 shadow-card border border-gray-100 ring-1 ${s.ring} card-transition hover:shadow-card-hover`}
+            >
+              <div className={`w-9 h-9 rounded-xl ${s.bg} flex items-center justify-center mb-2.5`}>
+                <s.icon className={`w-5 h-5 ${s.color}`} />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 tabular-nums">{s.value}</p>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
       )}
 
       {/* Search + Filters */}
-      <div className="mb-4 space-y-2">
+      <div className="mb-4 space-y-2 animate-fade-in">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -225,7 +209,7 @@ export function DashboardPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search customer, vehicle, or VIN..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all text-sm"
             />
           </div>
           <button
@@ -236,7 +220,11 @@ export function DashboardPage() {
               setSearch('');
               setAssigningId(null);
             }}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${showArchived ? 'bg-gray-700 border-gray-700 text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+              showArchived
+                ? 'bg-primary-800 border-primary-800 text-white'
+                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+            }`}
             title={showArchived ? 'Back to active' : 'View archived'}
           >
             <Archive className="w-4 h-4" />
@@ -248,7 +236,7 @@ export function DashboardPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-sm"
+              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all"
             >
               <option value="all">All Statuses</option>
               <option value="not_started">Not Started</option>
@@ -260,7 +248,7 @@ export function DashboardPage() {
             <select
               value={techFilter}
               onChange={(e) => setTechFilter(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-sm"
+              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all"
             >
               <option value="all">All Techs</option>
               <option value="unassigned">Unassigned</option>
@@ -272,17 +260,17 @@ export function DashboardPage() {
         )}
       </div>
 
-      {/* Resume Check-In Section — incomplete check-ins */}
+      {/* Resume Check-In Section */}
       {!showArchived && !hasActiveFilters && needsCheckin.length > 0 && (
-        <div className="mb-6 space-y-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
-            <RotateCw className="w-3 h-3" /> Resume Check-In ({needsCheckin.length})
+        <div className="mb-6 space-y-2 animate-fade-in">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+            <RotateCw className="w-3.5 h-3.5 text-accent-500" /> Resume Check-In ({needsCheckin.length})
           </p>
           {needsCheckin.map(i => (
             <button
               key={i.id}
               onClick={() => navigate(`/checkin/${i.id}`)}
-              className="w-full bg-warning-50 border border-warning-200 rounded-xl p-3 text-left hover:border-warning-300 flex items-center gap-3"
+              className="w-full bg-accent-50 border border-accent-200 rounded-2xl p-3.5 text-left hover:border-accent-300 hover:bg-accent-100/50 transition-all flex items-center gap-3 card-transition"
             >
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-gray-900 text-sm truncate">
@@ -296,7 +284,7 @@ export function DashboardPage() {
                     : 'No customer yet'} · {format(new Date(i.created_at), 'MMM d, h:mm a')}
                 </p>
               </div>
-              <span className="flex-shrink-0 px-3 py-1.5 bg-warning-500 text-white text-xs font-semibold rounded-lg">
+              <span className="flex-shrink-0 px-3 py-1.5 bg-accent-500 text-white text-xs font-semibold rounded-lg shadow-sm">
                 Resume
               </span>
             </button>
@@ -308,7 +296,7 @@ export function DashboardPage() {
       {!showArchived && (
         <button
           onClick={() => navigate('/checkin')}
-          className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 mb-6"
+          className="w-full bg-accent-500 hover:bg-accent-600 text-white font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 mb-6 transition-all active:scale-[0.98] shadow-card hover:shadow-card-hover"
         >
           <Plus className="w-5 h-5" /> New Check-In
         </button>
@@ -316,7 +304,7 @@ export function DashboardPage() {
 
       {/* Archived Banner */}
       {showArchived && (
-        <div className="flex items-center gap-2 mb-4 p-3 bg-gray-100 rounded-xl">
+        <div className="flex items-center gap-2 mb-4 p-3 bg-gray-100 rounded-xl border border-gray-200">
           <Archive className="w-4 h-4 text-gray-500" />
           <span className="text-sm text-gray-600 font-medium">Archived Inspections</span>
         </div>
@@ -324,14 +312,21 @@ export function DashboardPage() {
 
       {/* Main Inspection List */}
       {loading ? (
-        <div className="text-center py-8 text-gray-500">Loading...</div>
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl p-4 border border-gray-100">
+              <div className="h-5 w-1/2 rounded-lg skeleton mb-2" />
+              <div className="h-4 w-1/3 rounded-lg skeleton" />
+            </div>
+          ))}
+        </div>
       ) : loadError ? (
         <div className="text-center py-12">
           <AlertTriangle className="w-12 h-12 text-danger-300 mx-auto mb-3" />
           <p className="text-gray-600 mb-4">Unable to load inspections. Check your connection and try again.</p>
           <button
             onClick={() => loadInspections()}
-            className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl"
+            className="px-6 py-2.5 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl transition-colors"
           >
             Try Again
           </button>
@@ -342,11 +337,10 @@ export function DashboardPage() {
           <p className="text-gray-500">{showArchived ? 'No archived inspections' : 'No inspections found'}</p>
         </div>
       ) : showGrouped ? (
-        /* Grouped by operational category */
         <div className="space-y-6">
           {groups.map(g => g.items.length > 0 && (
-            <div key={g.key} className="space-y-2">
-              <p className={`text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 ${g.color}`}>
+            <div key={g.key} className="space-y-2 animate-fade-in">
+              <p className={`text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 ${g.color}`}>
                 <g.icon className="w-3.5 h-3.5" /> {g.label} ({g.items.length})
               </p>
               {g.items.map(i => renderCard(i))}
@@ -354,27 +348,26 @@ export function DashboardPage() {
           ))}
         </div>
       ) : (
-        /* Flat list when search/filter is active or viewing archived */
         <div className="space-y-3">
           {filtered.map(i => renderCard(i))}
         </div>
       )}
 
-      {/* Recent Activity — last 5 updated inspections */}
+      {/* Recent Activity */}
       {!showArchived && !loading && !loadError && recentActivity.length > 0 && (
         <div className="mt-8">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-3">
-            <Activity className="w-3.5 h-3.5" /> Recent Activity
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-3">
+            <Activity className="w-3.5 h-3.5 text-accent-500" /> Recent Activity
           </p>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
+          <div className="bg-white rounded-2xl shadow-card border border-gray-100 divide-y divide-gray-50">
             {recentActivity.map(i => (
               <button
                 key={i.id}
                 onClick={() => navigate(cardRoute(i))}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <Car className="w-4 h-4 text-gray-400" />
+                <div className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+                  <Car className="w-4 h-4 text-primary-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
@@ -395,8 +388,6 @@ export function DashboardPage() {
     </div>
   );
 
-  // ── Card renderer ───────────────────────────────────────────────
-
   function renderCard(i: Inspection) {
     const tech = i.assigned_tech_id ? techMap.get(i.assigned_tech_id) : null;
     const isUnassigned = i.checkin_complete !== false && i.status === 'not_started' && !i.assigned_tech_id;
@@ -406,9 +397,11 @@ export function DashboardPage() {
       <div
         key={i.id}
         onClick={() => { setAssigningId(null); navigate(route); }}
-        className={`w-full bg-white rounded-xl p-4 shadow-sm border text-left hover:border-primary-300 cursor-pointer ${i.checkin_complete === false ? 'border-warning-200 bg-warning-50/30' : 'border-gray-200'}`}
+        className={`w-full bg-white rounded-2xl p-4 shadow-card border text-left cursor-pointer card-transition hover:shadow-card-hover ${
+          i.checkin_complete === false ? 'border-accent-200 bg-accent-50/20' : 'border-gray-100 hover:border-accent-200'
+        }`}
       >
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex justify-between items-start mb-2.5">
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold text-gray-900 truncate">
               {i.vehicle_make || i.vehicle_model
@@ -421,10 +414,10 @@ export function DashboardPage() {
                 : 'No customer yet'}
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
             <StatusBadge status={i.status} size="sm" />
             {i.correction_requested_at && (
-              <span className="text-xs bg-danger-100 text-danger-700 px-2 py-0.5 rounded-full font-medium">
+              <span className="text-xs bg-danger-50 text-danger-700 px-2 py-0.5 rounded-full font-medium border border-danger-100">
                 Correction Requested
               </span>
             )}
@@ -435,16 +428,16 @@ export function DashboardPage() {
         </div>
 
         <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-4 text-sm text-gray-600 min-w-0">
-            <span className="flex-shrink-0">{format(new Date(i.created_at), 'MMM d')}</span>
+          <div className="flex items-center gap-3 text-sm text-gray-500 min-w-0">
+            <span className="flex-shrink-0 font-medium">{format(new Date(i.created_at), 'MMM d')}</span>
             <span className="flex items-center gap-1 flex-shrink-0">
-              <Car className="w-4 h-4" /> {i.vehicle_mileage.toLocaleString()} mi
+              <Car className="w-3.5 h-3.5" /> {i.vehicle_mileage.toLocaleString()} mi
             </span>
           </div>
 
           {tech ? (
             <span className="flex items-center gap-1 text-xs text-gray-600 flex-shrink-0">
-              <Wrench className="w-3 h-3" /> {tech.full_name}
+              <Wrench className="w-3 h-3 text-accent-500" /> {tech.full_name}
             </span>
           ) : i.assigned_tech_id ? (
             <span className="text-xs text-gray-400 flex-shrink-0">Assigned</span>
@@ -455,7 +448,7 @@ export function DashboardPage() {
                   e.stopPropagation();
                   setAssigningId(assigningId === i.id ? null : i.id);
                 }}
-                className="flex items-center gap-1 px-2 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-lg hover:bg-primary-100"
+                className="flex items-center gap-1 px-2.5 py-1 bg-accent-50 text-accent-700 text-xs font-semibold rounded-lg hover:bg-accent-100 transition-colors"
               >
                 <UserPlus className="w-3 h-3" /> Assign
                 <ChevronDown className="w-3 h-3" />
@@ -467,7 +460,7 @@ export function DashboardPage() {
                     onClick={(e) => { e.stopPropagation(); setAssigningId(null); }}
                   />
                   <div
-                    className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[180px] py-1 max-h-60 overflow-y-auto"
+                    className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-elevated z-20 min-w-[180px] py-1 max-h-60 overflow-y-auto"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {techs.length === 0 ? (
@@ -478,7 +471,7 @@ export function DashboardPage() {
                           key={t.id}
                           onClick={(e) => { e.stopPropagation(); assignTech(i.id, t.id); }}
                           disabled={assigning}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
                         >
                           {t.full_name}
                         </button>

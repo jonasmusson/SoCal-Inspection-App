@@ -1,9 +1,21 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Mail, Lock, User, Eye, EyeOff, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, CheckCircle, ArrowLeft, Car } from 'lucide-react';
 
 interface LoginPageProps { onSuccess: () => void; onShowSignup: () => void; }
 interface SignupPageProps { onSuccess: () => void; onShowLogin: () => void; }
+
+function Brand() {
+  return (
+    <div className="text-center mb-8">
+      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent-500 mb-4 shadow-elevated">
+        <Car className="w-7 h-7 text-primary-900" />
+      </div>
+      <h1 className="font-display text-3xl tracking-wide text-primary-900">SoCAL AUTOWORKS</h1>
+      <p className="text-xs text-gray-500 mt-1 uppercase tracking-[0.2em]">Inspection Management System</p>
+    </div>
+  );
+}
 
 export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
   const [email, setEmail] = useState('');
@@ -53,17 +65,14 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
 
   if (forgotMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md w-full">
-          <div className="text-center mb-8">
-            <img src="/image.png" alt="SoCal Autoworks" className="h-20 mx-auto mb-4 object-contain" />
-            <p className="text-gray-500 mt-2">Inspection Management System</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow-lg p-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+        <div className="max-w-md w-full animate-slide-up">
+          <Brand />
+          <div className="bg-white rounded-2xl shadow-elevated p-8">
             {forgotSent ? (
               <div className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success-100 mb-4">
-                  <CheckCircle className="w-8 h-8 text-success-600" />
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-success-100 mb-4">
+                  <CheckCircle className="w-7 h-7 text-success-600" />
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 mb-3">Check your email</h2>
                 <p className="text-gray-600 mb-6">
@@ -71,14 +80,14 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
                   Click the link in the email to set a new password.
                 </p>
                 <button onClick={() => { setForgotMode(false); setForgotSent(false); setEmail(''); }}
-                  className="text-primary-600 font-medium hover:underline text-sm">
+                  className="text-accent-600 font-medium hover:underline text-sm">
                   Back to Sign In
                 </button>
               </div>
             ) : (
               <>
                 <button onClick={() => setForgotMode(false)}
-                  className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm mb-4">
+                  className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm mb-4 transition-colors">
                   <ArrowLeft className="w-4 h-4" /> Back to Sign In
                 </button>
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">Reset Password</h2>
@@ -87,17 +96,17 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
                 </p>
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
+                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none transition-all"
                         placeholder="your@email.com" required />
                     </div>
                   </div>
                   {forgotError && <div className="p-3 bg-danger-50 text-danger-700 rounded-lg text-sm">{forgotError}</div>}
                   <button type="submit" disabled={loading}
-                    className="w-full py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl disabled:opacity-50">
+                    className="w-full py-3 px-4 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl disabled:opacity-50 transition-colors">
                     {loading ? 'Sending...' : 'Send Reset Link'}
                   </button>
                 </form>
@@ -110,53 +119,53 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <img src="/image.png" alt="SoCal Autoworks" className="h-20 mx-auto mb-4 object-contain" />
-          <p className="text-gray-500 mt-2">Inspection Management System</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Sign In</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <div className="max-w-md w-full animate-slide-up">
+        <Brand />
+        <div className="bg-white rounded-2xl shadow-elevated p-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-1">Sign In</h2>
+          <p className="text-sm text-gray-500 mb-6">Enter your credentials to access the inspection system</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none transition-all"
                   placeholder="your@email.com" required />
               </div>
             </div>
             <div>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-sm font-medium text-gray-700">Password</label>
                 <button type="button" onClick={() => { setForgotMode(true); setError(null); }}
-                  className="text-xs text-primary-600 font-medium hover:underline">
+                  className="text-xs text-accent-600 font-medium hover:underline">
                   Forgot password?
                 </button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
+                  className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none transition-all"
                   placeholder="Enter password" required />
                 <button type="button" onClick={() => setShowPass(p => !p)}
                   aria-label={showPass ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
                   {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
-            {error && <div className="p-3 bg-danger-50 text-danger-700 rounded-lg text-sm">{error}</div>}
+            {error && (
+              <div className="p-3 bg-danger-50 text-danger-700 rounded-lg text-sm animate-fade-in">{error}</div>
+            )}
             <button type="submit" disabled={loading}
-              className="w-full py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl disabled:opacity-50">
+              className="w-full py-3 px-4 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl disabled:opacity-50 transition-colors active:scale-[0.98]">
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">Don't have an account?{' '}
-              <button onClick={onShowSignup} className="text-primary-600 font-medium hover:underline">Request Access</button>
+          <div className="mt-6 text-center border-t border-gray-100 pt-6">
+            <p className="text-gray-600 text-sm">Don't have an account?{' '}
+              <button onClick={onShowSignup} className="text-accent-600 font-semibold hover:underline">Request Access</button>
             </p>
           </div>
         </div>
@@ -196,9 +205,6 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
     });
     if (signUpError) { setError(signUpError.message); setLoading(false); return; }
     if (data.user) {
-      // The database trigger creates the profile. It automatically activates the
-      // designated owner and leaves every other new account pending approval.
-      // Fire-and-forget — don't block the UI on email delivery
       if (email.trim().toLowerCase() !== OWNER_EMAIL) {
         supabase.functions.invoke('send-signup-confirmation', { body: { userId: data.user.id } });
       }
@@ -208,10 +214,10 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md w-full text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success-100 mb-4">
-            <CheckCircle className="w-8 h-8 text-success-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+        <div className="max-w-md w-full text-center animate-slide-up">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-success-100 mb-4">
+            <CheckCircle className="w-7 h-7 text-success-600" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-3">{email.trim().toLowerCase() === OWNER_EMAIL ? 'Owner account created' : 'Access request submitted'}</h2>
           {email.trim().toLowerCase() === OWNER_EMAIL ? (
@@ -222,7 +228,7 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
               <p className="text-gray-500 text-sm">A manager or owner will review your request. You'll receive a welcome email at <strong className="text-gray-700">{email}</strong> once approved.</p>
             </>
           )}
-          <button onClick={onShowLogin} className="mt-8 text-primary-600 font-medium hover:underline text-sm">{email.trim().toLowerCase() === OWNER_EMAIL ? 'Continue to Sign In' : 'Back to Sign In'}</button>
+          <button onClick={onShowLogin} className="mt-8 text-accent-600 font-semibold hover:underline text-sm">{email.trim().toLowerCase() === OWNER_EMAIL ? 'Continue to Sign In' : 'Back to Sign In'}</button>
         </div>
       </div>
     );
@@ -231,53 +237,51 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
   const passwordsMatch = confirmPassword === '' || password === confirmPassword;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <img src="/image.png" alt="SoCal Autoworks" className="h-20 mx-auto mb-4 object-contain" />
-          <p className="text-gray-500 mt-1 text-sm">Request access to the inspection system</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Create Account</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-8">
+      <div className="max-w-md w-full animate-slide-up">
+        <Brand />
+        <div className="bg-white rounded-2xl shadow-elevated p-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-1">Create Account</h2>
+          <p className="text-sm text-gray-500 mb-6">Request access to the inspection system</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">First Name</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                    className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none text-sm transition-all"
                     placeholder="John" required />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Last Name</label>
                 <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                  className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none text-sm transition-all"
                   placeholder="Smith" required />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none transition-all"
                   placeholder="your@email.com" required />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
+                  className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-accent-400 focus:border-accent-400 outline-none transition-all"
                   placeholder="Create a secure password" required minLength={12} />
                 <button type="button" onClick={() => setShowPass(p => !p)}
                   aria-label={showPass ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
                   {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
@@ -287,18 +291,18 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type={showConfirm ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`w-full pl-10 pr-10 py-3 border rounded-xl focus:ring-2 focus:ring-primary-500 outline-none ${!passwordsMatch ? 'border-danger-400 bg-danger-50' : 'border-gray-300'}`}
+                  className={`w-full pl-10 pr-10 py-3 border rounded-xl focus:ring-2 focus:ring-accent-400 outline-none transition-all ${!passwordsMatch ? 'border-danger-400 bg-danger-50' : 'border-gray-300'}`}
                   placeholder="Re-enter password" required />
                 <button type="button" onClick={() => setShowConfirm(p => !p)}
                   aria-label={showConfirm ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
                   {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
@@ -307,21 +311,21 @@ export function SignupPage({ onShowLogin }: SignupPageProps) {
               )}
             </div>
 
-            <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
-              <p className="text-xs text-blue-700 leading-relaxed">
+            <div className="p-3 bg-accent-50 rounded-xl border border-accent-100">
+              <p className="text-xs text-accent-800 leading-relaxed">
                 The designated Owner account is activated automatically. All other accounts require approval from an Owner or Manager.
               </p>
             </div>
 
-            {error && <div className="p-3 bg-danger-50 text-danger-700 rounded-lg text-sm">{error}</div>}
+            {error && <div className="p-3 bg-danger-50 text-danger-700 rounded-lg text-sm animate-fade-in">{error}</div>}
             <button type="submit" disabled={loading || !passwordsMatch}
-              className="w-full py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl disabled:opacity-50">
+              className="w-full py-3 px-4 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl disabled:opacity-50 transition-colors active:scale-[0.98]">
               {loading ? 'Submitting...' : 'Submit Request'}
             </button>
           </form>
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">Already have an account?{' '}
-              <button onClick={onShowLogin} className="text-primary-600 font-medium hover:underline">Sign In</button>
+          <div className="mt-6 text-center border-t border-gray-100 pt-6">
+            <p className="text-gray-600 text-sm">Already have an account?{' '}
+              <button onClick={onShowLogin} className="text-accent-600 font-semibold hover:underline">Sign In</button>
             </p>
           </div>
         </div>

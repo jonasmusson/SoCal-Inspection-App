@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -23,15 +25,19 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f9fafb;
+  background-color: #f3f4f6;
 }
 
 #root {
   min-height: 100%;
 }
 
+.font-display {
+  letter-spacing: 0.02em;
+}
+
 select {
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%237e8791' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
   background-position: right 0.5rem center;
   background-repeat: no-repeat;
   background-size: 1.5em 1.5em;
@@ -52,7 +58,7 @@ input:focus, select:focus, textarea:focus, button:focus {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #e5e7eb;
+  background: #d1d5d9;
   border-radius: 2px;
 }
 
@@ -64,6 +70,22 @@ input::-webkit-inner-spin-button {
 
 input[type=number] {
   -moz-appearance: textfield;
+}
+
+/* Premium card hover transition */
+.card-transition {
+  transition: box-shadow 0.2s ease-out, border-color 0.2s ease-out, transform 0.15s ease-out;
+}
+
+.card-transition:hover {
+  transform: translateY(-1px);
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg, #e8ebed 25%, #f5f6f7 50%, #e8ebed 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
 }
 
 @media print {
