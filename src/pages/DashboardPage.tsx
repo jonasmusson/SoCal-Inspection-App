@@ -174,11 +174,12 @@ export function DashboardPage() {
   const showGrouped = !hasActiveFilters && !showArchived;
 
   return (
-    <div className="p-4 sm:p-6 pb-24 sm:pb-6 max-w-5xl mx-auto">
+    <div className="p-5 sm:p-6 pb-24 sm:pb-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-6 animate-slide-up">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-primary-500 mb-1">Overview</p>
         <h1 className="font-display text-3xl tracking-wide text-primary-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-0.5">Welcome back, {profile?.full_name}</p>
+        <p className="text-primary-500 text-sm mt-1">Welcome back, {profile?.full_name}</p>
       </div>
 
       {/* Stat Cards */}
@@ -187,13 +188,13 @@ export function DashboardPage() {
           {statCards.map(s => (
             <div
               key={s.label}
-              className={`bg-white rounded-2xl p-4 shadow-card border border-gray-100 ring-1 ${s.ring} card-transition hover:shadow-card-hover`}
+              className={`bg-white rounded-xl p-4 shadow-card border border-primary-100 ring-1 ${s.ring} card-transition hover:shadow-card-hover`}
             >
-              <div className={`w-9 h-9 rounded-xl ${s.bg} flex items-center justify-center mb-2.5`}>
+              <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center mb-2.5`}>
                 <s.icon className={`w-5 h-5 ${s.color}`} />
               </div>
-              <p className="text-2xl font-bold text-gray-900 tabular-nums">{s.value}</p>
-              <p className="text-xs text-gray-500 font-medium mt-0.5">{s.label}</p>
+              <p className="text-2xl font-bold text-primary-900 tabular-nums">{s.value}</p>
+              <p className="text-xs text-primary-400 font-medium mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
@@ -203,13 +204,13 @@ export function DashboardPage() {
       <div className="mb-4 space-y-2 animate-fade-in">
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search customer, vehicle, or VIN..."
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all text-sm"
+              className="w-full pl-10 pr-4 py-2.5 border border-primary-200 rounded-lg bg-white focus:ring-2 focus:ring-primary-300 focus:border-primary-400 transition-all text-sm"
             />
           </div>
           <button
@@ -220,10 +221,10 @@ export function DashboardPage() {
               setSearch('');
               setAssigningId(null);
             }}
-            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all ${
               showArchived
-                ? 'bg-primary-800 border-primary-800 text-white'
-                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                ? 'bg-primary-900 border-primary-900 text-white'
+                : 'border-primary-200 bg-white text-primary-500 hover:bg-primary-50'
             }`}
             title={showArchived ? 'Back to active' : 'View archived'}
           >
@@ -236,7 +237,7 @@ export function DashboardPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all"
+              className="flex-1 px-4 py-2.5 border border-primary-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-300 focus:border-primary-400 transition-all"
             >
               <option value="all">All Statuses</option>
               <option value="not_started">Not Started</option>
@@ -248,7 +249,7 @@ export function DashboardPage() {
             <select
               value={techFilter}
               onChange={(e) => setTechFilter(e.target.value)}
-              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all"
+              className="flex-1 px-4 py-2.5 border border-primary-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-300 focus:border-primary-400 transition-all"
             >
               <option value="all">All Techs</option>
               <option value="unassigned">Unassigned</option>
@@ -263,22 +264,22 @@ export function DashboardPage() {
       {/* Resume Check-In Section */}
       {!showArchived && !hasActiveFilters && needsCheckin.length > 0 && (
         <div className="mb-6 space-y-2 animate-fade-in">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-primary-500 flex items-center gap-1.5">
             <RotateCw className="w-3.5 h-3.5 text-accent-500" /> Resume Check-In ({needsCheckin.length})
           </p>
           {needsCheckin.map(i => (
             <button
               key={i.id}
               onClick={() => navigate(`/checkin/${i.id}`)}
-              className="w-full bg-accent-50 border border-accent-200 rounded-2xl p-3.5 text-left hover:border-accent-300 hover:bg-accent-100/50 transition-all flex items-center gap-3 card-transition"
+              className="w-full bg-accent-50 border border-accent-200 rounded-xl p-3.5 text-left hover:border-accent-300 hover:bg-accent-100/50 transition-all flex items-center gap-3 card-transition"
             >
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-gray-900 text-sm truncate">
+                <h3 className="font-semibold text-primary-900 text-sm truncate">
                   {i.vehicle_make || i.vehicle_model
                     ? `${i.vehicle_year} ${i.vehicle_make} ${i.vehicle_model}`
                     : 'New check-in'}
                 </h3>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-xs text-primary-400 truncate">
                   {i.customer_first_name || i.customer_last_name
                     ? `${i.customer_first_name} ${i.customer_last_name}`
                     : 'No customer yet'} · {format(new Date(i.created_at), 'MMM d, h:mm a')}
@@ -296,7 +297,7 @@ export function DashboardPage() {
       {!showArchived && (
         <button
           onClick={() => navigate('/checkin')}
-          className="w-full bg-accent-500 hover:bg-accent-600 text-white font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 mb-6 transition-all active:scale-[0.98] shadow-card hover:shadow-card-hover"
+          className="w-full bg-accent-500 hover:bg-accent-600 text-white font-semibold py-3.5 rounded-lg flex items-center justify-center gap-2 mb-6 transition-all active:scale-[0.98] shadow-card hover:shadow-card-hover"
         >
           <Plus className="w-5 h-5" /> New Check-In
         </button>
@@ -304,9 +305,9 @@ export function DashboardPage() {
 
       {/* Archived Banner */}
       {showArchived && (
-        <div className="flex items-center gap-2 mb-4 p-3 bg-gray-100 rounded-xl border border-gray-200">
-          <Archive className="w-4 h-4 text-gray-500" />
-          <span className="text-sm text-gray-600 font-medium">Archived Inspections</span>
+        <div className="flex items-center gap-2 mb-4 p-3 bg-primary-100 rounded-lg border border-primary-200">
+          <Archive className="w-4 h-4 text-primary-500" />
+          <span className="text-sm text-primary-600 font-medium">Archived Inspections</span>
         </div>
       )}
 
@@ -314,7 +315,7 @@ export function DashboardPage() {
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl p-4 border border-gray-100">
+            <div key={i} className="bg-white rounded-xl p-4 border border-primary-100">
               <div className="h-5 w-1/2 rounded-lg skeleton mb-2" />
               <div className="h-4 w-1/3 rounded-lg skeleton" />
             </div>
@@ -323,24 +324,24 @@ export function DashboardPage() {
       ) : loadError ? (
         <div className="text-center py-12">
           <AlertTriangle className="w-12 h-12 text-danger-300 mx-auto mb-3" />
-          <p className="text-gray-600 mb-4">Unable to load inspections. Check your connection and try again.</p>
+          <p className="text-primary-600 mb-4">Unable to load inspections. Check your connection and try again.</p>
           <button
             onClick={() => loadInspections()}
-            className="px-6 py-2.5 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl transition-colors"
+            className="px-6 py-2.5 bg-primary-900 hover:bg-primary-800 text-white font-semibold rounded-lg transition-colors"
           >
             Try Again
           </button>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12">
-          <Archive className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">{showArchived ? 'No archived inspections' : 'No inspections found'}</p>
+          <Archive className="w-12 h-12 text-primary-300 mx-auto mb-3" />
+          <p className="text-primary-500">{showArchived ? 'No archived inspections' : 'No inspections found'}</p>
         </div>
       ) : showGrouped ? (
         <div className="space-y-6">
           {groups.map(g => g.items.length > 0 && (
             <div key={g.key} className="space-y-2 animate-fade-in">
-              <p className={`text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 ${g.color}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-[0.12em] flex items-center gap-1.5 ${g.color}`}>
                 <g.icon className="w-3.5 h-3.5" /> {g.label} ({g.items.length})
               </p>
               {g.items.map(i => renderCard(i))}
@@ -356,26 +357,26 @@ export function DashboardPage() {
       {/* Recent Activity */}
       {!showArchived && !loading && !loadError && recentActivity.length > 0 && (
         <div className="mt-8">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-primary-500 flex items-center gap-1.5 mb-3">
             <Activity className="w-3.5 h-3.5 text-accent-500" /> Recent Activity
           </p>
-          <div className="bg-white rounded-2xl shadow-card border border-gray-100 divide-y divide-gray-50">
+          <div className="bg-white rounded-xl shadow-card border border-primary-100 divide-y divide-primary-50">
             {recentActivity.map(i => (
               <button
                 key={i.id}
                 onClick={() => navigate(cardRoute(i))}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-primary-50 transition-colors"
               >
-                <div className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
                   <Car className="w-4 h-4 text-primary-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-primary-900 truncate">
                     {i.vehicle_make || i.vehicle_model
                       ? `${i.vehicle_year} ${i.vehicle_make} ${i.vehicle_model}`
                       : 'New check-in'}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-xs text-primary-400 truncate">
                     {activityDescription(i)} · {format(new Date(i.updated_at), 'MMM d, h:mm a')}
                   </p>
                 </div>
@@ -397,18 +398,18 @@ export function DashboardPage() {
       <div
         key={i.id}
         onClick={() => { setAssigningId(null); navigate(route); }}
-        className={`w-full bg-white rounded-2xl p-4 shadow-card border text-left cursor-pointer card-transition hover:shadow-card-hover ${
-          i.checkin_complete === false ? 'border-accent-200 bg-accent-50/20' : 'border-gray-100 hover:border-accent-200'
+        className={`w-full bg-white rounded-xl p-4 shadow-card border text-left cursor-pointer card-transition hover:shadow-card-hover ${
+          i.checkin_complete === false ? 'border-accent-200 bg-accent-50/20' : 'border-primary-100 hover:border-primary-300'
         }`}
       >
         <div className="flex justify-between items-start mb-2.5">
           <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-gray-900 truncate">
+            <h3 className="font-semibold text-primary-900 truncate">
               {i.vehicle_make || i.vehicle_model
                 ? `${i.vehicle_year} ${i.vehicle_make} ${i.vehicle_model}`
                 : 'New check-in'}
             </h3>
-            <p className="text-sm text-gray-500 truncate">
+            <p className="text-sm text-primary-400 truncate">
               {i.customer_first_name || i.customer_last_name
                 ? `${i.customer_first_name} ${i.customer_last_name}`
                 : 'No customer yet'}
@@ -422,13 +423,13 @@ export function DashboardPage() {
               </span>
             )}
             {showArchived && i.archived_at && (
-              <span className="text-xs text-gray-400">{format(new Date(i.archived_at), 'MMM d, yyyy')}</span>
+              <span className="text-xs text-primary-400">{format(new Date(i.archived_at), 'MMM d, yyyy')}</span>
             )}
           </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-3 text-sm text-gray-500 min-w-0">
+          <div className="flex items-center gap-3 text-sm text-primary-400 min-w-0">
             <span className="flex-shrink-0 font-medium">{format(new Date(i.created_at), 'MMM d')}</span>
             <span className="flex items-center gap-1 flex-shrink-0">
               <Car className="w-3.5 h-3.5" /> {i.vehicle_mileage.toLocaleString()} mi
@@ -436,11 +437,11 @@ export function DashboardPage() {
           </div>
 
           {tech ? (
-            <span className="flex items-center gap-1 text-xs text-gray-600 flex-shrink-0">
+            <span className="flex items-center gap-1 text-xs text-primary-500 flex-shrink-0">
               <Wrench className="w-3 h-3 text-accent-500" /> {tech.full_name}
             </span>
           ) : i.assigned_tech_id ? (
-            <span className="text-xs text-gray-400 flex-shrink-0">Assigned</span>
+            <span className="text-xs text-primary-400 flex-shrink-0">Assigned</span>
           ) : isUnassigned && !showArchived ? (
             <div className="relative flex-shrink-0">
               <button
@@ -460,18 +461,18 @@ export function DashboardPage() {
                     onClick={(e) => { e.stopPropagation(); setAssigningId(null); }}
                   />
                   <div
-                    className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-elevated z-20 min-w-[180px] py-1 max-h-60 overflow-y-auto"
+                    className="absolute right-0 top-full mt-1 bg-white border border-primary-200 rounded-lg shadow-elevated z-20 min-w-[180px] py-1 max-h-60 overflow-y-auto"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {techs.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-gray-400">No techs available</p>
+                      <p className="px-3 py-2 text-xs text-primary-400">No techs available</p>
                     ) : (
                       techs.map(t => (
                         <button
                           key={t.id}
                           onClick={(e) => { e.stopPropagation(); assignTech(i.id, t.id); }}
                           disabled={assigning}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                          className="w-full px-3 py-2 text-left text-sm text-primary-700 hover:bg-primary-50 disabled:opacity-50 transition-colors"
                         >
                           {t.full_name}
                         </button>
@@ -487,6 +488,7 @@ export function DashboardPage() {
         {!showArchived && (
           <ProgressBar
             percent={['pending_review', 'approved', 'sent'].includes(i.status) ? 100 : i.progress_percent}
+            compact
           />
         )}
       </div>

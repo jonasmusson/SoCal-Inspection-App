@@ -7,11 +7,11 @@ interface ConditionButtonProps {
   onClick: () => void;
 }
 
-const config: Record<InspectionItemStatus, { border: string; selectedBg: string; icon: typeof Check; hover: string }> = {
-  good: { border: 'border-success-300', selectedBg: 'bg-success-500', icon: Check, hover: 'hover:border-success-400 hover:bg-success-50' },
-  monitor: { border: 'border-warning-300', selectedBg: 'bg-warning-500', icon: Eye, hover: 'hover:border-warning-400 hover:bg-warning-50' },
-  needs_attention: { border: 'border-danger-300', selectedBg: 'bg-danger-500', icon: AlertTriangle, hover: 'hover:border-danger-400 hover:bg-danger-50' },
-  not_inspected: { border: 'border-gray-300', selectedBg: 'bg-gray-700', icon: MinusCircle, hover: 'hover:border-gray-400 hover:bg-gray-50' },
+const config: Record<InspectionItemStatus, { selectedBg: string; icon: typeof Check; iconColor: string }> = {
+  good: { selectedBg: 'bg-success-500', icon: Check, iconColor: 'text-success-600' },
+  monitor: { selectedBg: 'bg-warning-500', icon: Eye, iconColor: 'text-warning-600' },
+  needs_attention: { selectedBg: 'bg-danger-500', icon: AlertTriangle, iconColor: 'text-danger-600' },
+  not_inspected: { selectedBg: 'bg-primary-200', icon: MinusCircle, iconColor: 'text-primary-400' },
 };
 
 export function ConditionButton({ condition, selected, onClick }: ConditionButtonProps) {
@@ -20,13 +20,13 @@ export function ConditionButton({ condition, selected, onClick }: ConditionButto
   return (
     <button
       onClick={onClick}
-      className={`min-w-0 flex items-center justify-center gap-1.5 px-2 py-3.5 rounded-xl text-sm font-semibold transition-all border-2 active:scale-[0.97] ${
+      className={`min-h-[52px] flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-sm font-semibold transition-all border active:scale-[0.97] ${
         selected
           ? `${c.selectedBg} text-white border-transparent shadow-card`
-          : `bg-white ${c.border} text-gray-600 ${c.hover}`
+          : `bg-white border-primary-200 text-primary-600 hover:border-primary-300 hover:bg-primary-50`
       }`}
     >
-      <Icon className="w-4 h-4 flex-shrink-0" />
+      <Icon className={`w-4 h-4 flex-shrink-0 ${selected ? 'text-white' : c.iconColor}`} />
       {condition === 'not_inspected' ? 'N/A' : CONDITION_LABELS[condition]}
     </button>
   );
