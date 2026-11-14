@@ -6,10 +6,10 @@ import { AuthShell } from './AuthShell';
 interface LoginPageProps { onSuccess: () => void; onShowSignup: () => void; }
 interface SignupPageProps { onSuccess: () => void; onShowLogin: () => void; }
 
-const inputClass = 'w-full rounded-lg border border-primary-200 bg-white px-3.5 py-3 text-sm text-primary-900 placeholder:text-primary-400 transition-colors focus:border-accent-500 focus:ring-2 focus:ring-accent-500/15';
+const inputClass = 'w-full rounded-lg border border-primary-200 bg-white px-3.5 py-3 text-sm text-primary-900 placeholder:text-primary-400 transition-colors focus:border-primary-600 focus:ring-2 focus:ring-primary-500/15';
 const iconInputClass = `${inputClass} pl-10`;
 const buttonClass = 'w-full rounded-lg bg-primary-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-50';
-const secondaryButtonClass = 'font-semibold text-accent-700 transition-colors hover:text-accent-900 hover:underline';
+const secondaryButtonClass = 'font-semibold text-primary-700 transition-colors hover:text-primary-950 hover:underline';
 
 function FieldLabel({ children, htmlFor }: { children: React.ReactNode; htmlFor: string }) {
   return <label htmlFor={htmlFor} className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-primary-600">{children}</label>;
@@ -102,7 +102,7 @@ export function LoginPage({ onSuccess, onShowSignup }: LoginPageProps) {
     <AuthShell eyebrow="Authorized staff access" title="Sign in to your workspace" description="Manage inspections, findings, and customer reports from one precise workspace." footer={<p className="text-sm text-primary-500">Need access? <button onClick={onShowSignup} className={secondaryButtonClass}>Request access</button></p>}>
       <form onSubmit={handleSubmit} className="space-y-5">
         <div><FieldLabel htmlFor="login-email">Email address</FieldLabel><div className="relative"><Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary-400" /><input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={iconInputClass} placeholder="name@company.com" autoComplete="email" required /></div></div>
-        <div><div className="mb-2 flex items-center justify-between"><FieldLabel htmlFor="login-password">Password</FieldLabel><button type="button" onClick={() => { setForgotMode(true); setError(null); }} className="text-xs font-semibold text-accent-700 hover:text-accent-900">Forgot password?</button></div><PasswordInput id="login-password" value={password} onChange={setPassword} placeholder="Enter your password" show={showPass} onToggle={() => setShowPass((value) => !value)} /></div>
+        <div><div className="mb-2 flex items-center justify-between"><FieldLabel htmlFor="login-password">Password</FieldLabel><button type="button" onClick={() => { setForgotMode(true); setError(null); }} className="text-xs font-semibold text-primary-700 hover:text-primary-950">Forgot password?</button></div><PasswordInput id="login-password" value={password} onChange={setPassword} placeholder="Enter your password" show={showPass} onToggle={() => setShowPass((value) => !value)} /></div>
         {error && <div role="alert" className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2.5 text-sm leading-5 text-danger-700">{error}</div>}
         <button type="submit" disabled={loading} className={buttonClass}>{loading ? 'Signing in…' : 'Sign in'}</button>
       </form>
