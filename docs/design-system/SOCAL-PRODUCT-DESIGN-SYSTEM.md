@@ -1,5 +1,5 @@
 # SoCal Product Design System — Shared Design Contract
-**Version:** 0.1.0 · **Status:** Working baseline pending visual approval · **Owner:** SoCal Autoworks product family
+**Version:** 0.2.0 · **Status:** Shared operational UI direction approved; visual implementation still requires review · **Owner:** SoCal Autoworks product family
 **Canonical home:** `jonasmusson/SoCal-Autoworks-Website/docs/design-system/SOCAL-PRODUCT-DESIGN-SYSTEM.md`
 This file is mirrored to the Inspection App, HUB, and SoCal Classic Cars repositories. Copies must match the canonical version when updated.
 
@@ -8,6 +8,26 @@ People should immediately recognize that the SoCal Autoworks site, SoCal HUB, In
 
 This is a **cross-product contract, not a command to restyle production immediately**. Preserve working and approved designs; propose and review any visual migration separately. The user has explicitly rejected playful icon-style branding, a lollipop-like `S/` emblem, and dominant dark-green application chrome.
 
+## Mandatory product UI parity — SoCal HUB and SoCal Inspect
+
+**Non-negotiable:** SoCal HUB and SoCal Inspect are two applications within **one software product family**, not separate products with loosely related aesthetics. Users switching between them must recognize the same visual components without needing to relearn how to navigate, enter information, save work, or interpret status.
+
+The HUB's Graphite & Warm White implementation is the **current operational UI reference** until a shared visual review selects a replacement. Both apps must use the same:
+- Typographic product lockup and header treatment: 60px graphite header; typography-led `SOCAL HUB` / `SOCAL INSPECT` name and a subdued, related Autoworks attribution. No invented car-tile badges, lollipop logos, icon emblems, or promotional hero panels on internal sign-in screens.
+- Global palette and token meanings; primary actions are graphite, while warning/repair/status categories use only meaningful semantic colors. The primary action, field focus and active nav must not randomly revert to orange or green.
+- Inter font, weight hierarchy, label casing, spacing rhythm, line heights, form dimensions, 8–10px radii, restrained shadows, and predictable controls.
+- Matching login/recovery/request-access layouts and conventions: a restrained professional work surface with a clear form, not a marketing landing page.
+- Matching component language for navigation, breadcrumbs, filters, cards, tables, modals, inputs, feedback, media, save indicators, status chips, and authorized/draft/approved states.
+- Equivalent interaction quality across desktop, iPad and iPhone, while arranging information for the user's actual task (inspection vs. shop operations).
+
+Product-specific **content** and task workflow can differ; styling is not an opportunity to invent a different brand. Any proposed exception requires a documented reason and explicit review before implementation.
+
+### Cross-product acceptance test
+A design change to either app must be checked against screenshots of the corresponding screen/component in the other app. Review at least: sign-in, list/dashboard, record detail, form, modal, save/error state, and mobile navigation. Record exact differences. A successful build or a single pretty mockup does not satisfy acceptance.
+
+### Agents and ownership
+ChatGPT and Bolt jointly own consistency. They must read this contract *before* editing UI, apply existing patterns, keep copies synchronized, and explicitly flag deviations. The shop owner should choose major creative direction, not repeatedly catch random font, icon, color, or layout drift.
+
 ## Family identity and brand architecture
 - Parent identity: **SoCal Autoworks**. Software names: **SoCal HUB** and **SoCal Inspect / Inspection App**. Maintain a consistent parent-wordmark relationship, naming/case, footer treatment and product sign-in identity.
 - SoCal Classic Cars is a **related but distinct customer-facing business**. Preserve its own name, buyer-focused voice and approved identity; reuse interaction quality, field patterns, rhythm and professionalism so the family resemblance is apparent.
@@ -15,7 +35,7 @@ This is a **cross-product contract, not a command to restyle production immediat
 - Guiding references: **Linear** for information hierarchy, speed and clarity; **Porsche Design** for precision, restraint and craftsmanship. Inspiration only—do not copy their trade dress, marks or layouts.
 
 ## Product UI baseline (HUB, Inspection App, Studio, operational tools)
-Use a coherent **Graphite & Warm White** direction unless a visual variant is explicitly reviewed:
+Both internal apps **must share** the **Graphite & Warm White** direction, exact token meanings and common component treatments unless a family-wide visual change is explicitly reviewed:
 - Canvas `#FAF9F7`; raised surface `#FFFFFF`; graphite navigation `#1C1C1E`; primary text `#1A1A1A`; secondary text `#64666B`; divider `#E4E1DC`.
 - Product primary action: graphite with high-contrast light text; subdued hover/focus treatment. Avoid green primary buttons or green sidebars.
 - Operational status colors convey meaning, not branding: success/good green; attention/awaiting amber; immediate/problem red; inactive/unknown neutral gray. Status words always accompany color.
