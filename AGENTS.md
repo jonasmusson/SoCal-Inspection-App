@@ -1,11 +1,11 @@
-# Working instructions — SoCal product family
+# SoCal product-family working instructions
 
-**Before changing ANY screen, theme, logo, layout, forms, or UX:** read `docs/design-system/SOCAL-PRODUCT-DESIGN-SYSTEM.md` and `docs/design-system/tokens.json`, along with existing repository-specific design standards. Apply the family design contract consistently and use documented exceptions for public/editorial websites.
+**Before editing ANY page or interface:** read `docs/design-system/SOCAL-PRODUCT-DESIGN-SYSTEM.md` and `docs/design-system/tokens.json` and any repository-specific design standards.
 
-This contract applies to Bolt, ChatGPT, other coding agents, and human contributors. Do not invent app-specific logos, dark-green product chrome, playful card systems, new fonts or unique interaction styles without documenting and reviewing the shared design change.
+**HUB and Inspection App must look and behave like the same software family** — same product typography/lockup, graphite header, warm-white canvas, forms, buttons, navigation conventions, status/save treatments and responsive quality. Different workflows are allowed; random stylistic reinvention is not. The HUB's Graphite & Warm White approach is the current software baseline. No car-icon logo tiles, dark-green application chrome, unnecessary promotional sign-in panels, playful ornament or unrelated fonts.
 
-Preserve the current functioning app, authentic findings, camera/media behavior, data and authorization. Do not apply production migrations or publish to live deployments for design work.
+Marketing sites may retain approved editorial typography and distinctive commerce branding; don't rebrand them without a separate approved review.
 
-Review actual rendered desktop, iPhone, and iPad experiences when supported; mock tests and build checks alone do not verify appearance.
+This applies to Bolt, ChatGPT, and human contributors. Cross-check corresponding screens in other SoCal products, use the established style, and record any documented exceptions. Update the canonical design document in `jonasmusson/SoCal-Autoworks-Website` and mirrored copies whenever the shared contract changes.
 
-**Canonical source:** `jonasmusson/SoCal-Autoworks-Website/docs/design-system/SOCAL-PRODUCT-DESIGN-SYSTEM.md`. This repository has a mirrored copy so assistants can work locally. Sync versioned changes across repos instead of writing inconsistent one-off instructions.
+Preserve real data, saved work, customer evidence, permissions and existing integrations. Do not deploy production apps or apply migrations merely for design changes. Visual acceptance requires rendered desktop/iPad/iPhone QA in addition to tests and builds.
