@@ -12,3 +12,6 @@ verify_jwt = true
 
 [functions.upload-brand-logo]
 verify_jwt = true
+
+[functions.socal-hub-workspace]
+verify_jwt = false
