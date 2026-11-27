@@ -73,6 +73,7 @@ export function DashboardPage() {
       );
       setTechs(data || []);
     } catch {
+      setLoadError(true);
     }
   }
 
@@ -87,6 +88,7 @@ export function DashboardPage() {
         prev.map(i => (i.id === inspectionId ? { ...i, assigned_tech_id: techId } : i)),
       );
     } catch {
+      setLoadError(true);
     } finally {
       setAssigning(false);
       setAssigningId(null);
